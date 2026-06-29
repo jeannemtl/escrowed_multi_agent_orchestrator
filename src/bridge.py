@@ -970,27 +970,39 @@ async def main():
                 elif msg_type == "plan_tasks":
                     # Planner: decompose user prompt into subtasks with dependencies
                     user_prompt = req.get("prompt", "")
-                    if not user_prompt:
+                    image_b64 = req.get("image", "")
+                    if not user_prompt and not image_b64:
                         await bridge._send_to(websocket, {"type": "plan_error", "data": {
-                            "error": "no prompt provided",
+                            "error": "no prompt or image provided",
                         }})
                         continue
 
-                    log.info(f"Planning: decomposing user prompt ({len(user_prompt)} chars)...")
-                    # Send planning status updates to dashboard
-                    await bridge._send_to(websocket, {"type": "planning", "data": {
-                        "stage": "starting",
-                        "message": "Connecting to Nemotron 3 Ultra via NemoClaw sandbox...",
-                        "planner": "nemotron-3-ultra",
-                    }})
+                    if image_b64:
+                        log.info(f"Planning from image ({len(image_b64)} chars base64)...")
+                        await bridge._send_to(websocket, {"type": "planning", "data": {
+                            "stage": "starting",
+                            "message": "Analyzing image with vision model...",
+                            "planner": "vision + nemotron",
+                        }})
+                    else:
+                        log.info(f"Planning: decomposing user prompt ({len(user_prompt)} chars)...")
+                        await bridge._send_to(websocket, {"type": "planning", "data": {
+                            "stage": "starting",
+                            "message": "Connecting to Nemotron 3 Ultra via NemoClaw sandbox...",
+                            "planner": "nemotron-3-ultra",
+                        }})
                     try:
-                        from planner import plan_tasks
+                        from planner import plan_tasks, plan_from_image
                         # Send progress after 5s if still planning
                         async def planning_progress():
                             await asyncio.sleep(5)
+                            if image_b64:
+                                msg = "Vision model analyzed image. Nemotron is decomposing into tasks..."
+                            else:
+                                msg = "Nemotron 3 Ultra is decomposing your prompt into tasks..."
                             await bridge._send_to(websocket, {"type": "planning", "data": {
                                 "stage": "thinking",
-                                "message": "Nemotron 3 Ultra is decomposing your prompt into tasks...",
+                                "message": msg,
                                 "planner": "nemotron-3-ultra",
                             }})
                             await asyncio.sleep(10)
@@ -1001,7 +1013,10 @@ async def main():
                             }})
                         progress_task = asyncio.create_task(planning_progress())
 
-                        tasks = await plan_tasks(user_prompt)
+                        if image_b64:
+                            tasks = await plan_from_image(image_b64)
+                        else:
+                            tasks = await plan_tasks(user_prompt)
                         progress_task.cancel()
 
                         if not tasks:

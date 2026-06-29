@@ -296,7 +296,17 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Monaco', mo
 
 <!-- ── User Prompt ── -->
 <div style="padding:10px;background:#0d1117;border-bottom:1px solid #1a1a3e;">
-  <textarea id="user-prompt" placeholder="Describe what you want the agents to do... (e.g. Research IBM sub-nm chip and Huawei LogicFolding, then create a synthesis report merging both)" style="width:100%;min-height:80px;background:#0a0a0f;border:1px solid #1a1a3e;color:#e0e0e0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;box-sizing:border-box;" oninput="updatePlanButton()"></textarea>
+  <div style="display:flex;gap:10px;align-items:flex-start;">
+    <textarea id="user-prompt" placeholder="Describe what you want the agents to do... (e.g. Research IBM sub-nm chip and Huawei LogicFolding, then create a synthesis report merging both)" style="flex:1;min-height:80px;background:#0a0a0f;border:1px solid #1a1a3e;color:#e0e0e0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;box-sizing:border-box;" oninput="updatePlanButton()"></textarea>
+    <div style="display:flex;flex-direction:column;gap:6px;align-items:center;">
+      <label for="image-upload" style="cursor:pointer;background:#1a1a2e;border:1px solid #333;border-radius:6px;padding:8px 12px;font-size:11px;color:#5bc0de;white-space:nowrap;text-align:center;transition:all 0.2s;" onmouseover="this.style.borderColor='#0f3460'" onmouseout="this.style.borderColor='#333'">
+        📷 Image
+      </label>
+      <input type="file" id="image-upload" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
+      <img id="image-preview" style="display:none;max-width:80px;max-height:80px;border-radius:6px;border:1px solid #333;" />
+      <button id="image-clear" style="display:none;font-size:9px;background:#2e1a1a;color:#e74c3c;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;" onclick="clearImage()">remove</button>
+    </div>
+  </div>
   <div id="planner-status" style="font-size:10px;color:#8a8a9a;margin-top:4px;"></div>
 </div>
 
@@ -537,21 +547,67 @@ function buildAgentPrompts() {
 function updatePlanButton() {
   const ta = document.getElementById('user-prompt');
   const btn = document.getElementById('btn-plan');
+  const hasImage = window.uploadedImageB64;
   if (ta && btn) {
-    btn.disabled = !ta.value.trim();
+    btn.disabled = !ta.value.trim() && !hasImage;
   }
+}
+
+// ── Image upload ──
+let uploadedImage = null;
+
+function handleImageUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // Show preview
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const preview = document.getElementById('image-preview');
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+
+    // Store base64 (strip data:image/...;base64, prefix)
+    const b64 = e.target.result.split(',')[1];
+    window.uploadedImageB64 = b64;
+    uploadedImage = b64;
+
+    // Show remove button
+    document.getElementById('image-clear').style.display = '';
+
+    // Enable plan button
+    updatePlanButton();
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearImage() {
+  window.uploadedImageB64 = null;
+  uploadedImage = null;
+  document.getElementById('image-preview').style.display = 'none';
+  document.getElementById('image-preview').src = '';
+  document.getElementById('image-clear').style.display = 'none';
+  document.getElementById('image-upload').value = '';
+  updatePlanButton();
 }
 
 // ── Plan & Submit: call the planner via the bridge ──
 function planAndSubmit() {
   const prompt = document.getElementById('user-prompt').value.trim();
-  if (!prompt) return;
+  const image = window.uploadedImageB64;
+  if (!prompt && !image) return;
 
   const statusDiv = document.getElementById('planner-status');
-  statusDiv.innerHTML = '<span style="color:#f5a623">Planning: calling Nemotron 3 Ultra to decompose prompt...</span>';
+  if (image) {
+    statusDiv.innerHTML = '<span style="color:#f5a623">Planning: analyzing image with vision model, then decomposing...</span>';
+  } else {
+    statusDiv.innerHTML = '<span style="color:#f5a623">Planning: calling Nemotron 3 Ultra to decompose prompt...</span>';
+  }
 
-  // Send the plan request to the bridge
-  send({type: 'plan_tasks', prompt: prompt});
+  // Send the plan request to the bridge (with optional image)
+  const msg = {type: 'plan_tasks', prompt: prompt};
+  if (image) msg.image = image;
+  send(msg);
 }
 
 // ── Collect tasks from prompt fields (legacy, not used with planner) ──
