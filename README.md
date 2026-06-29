@@ -1,4 +1,4 @@
-# WarpDAG
+# Cerebrain
 
 Multi-agent orchestration with on-chain attestation and Stripe escrow, running 37x faster on Cerebras wafer-scale inference.
 
