@@ -251,6 +251,31 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Monaco', mo
 .race-side.gpu .race-escrow-fill { background: linear-gradient(90deg, #e74c3c, #f5a623); }
 .race-escrow-detail { display: flex; justify-content: space-between; font-size: 9px; color: #666; margin-top: 3px; }
 .race-escrow-wallet { font-size: 10px; color: #f5a623; margin-top: 3px; }
+
+/* Race progress stepper */
+.race-stepper {
+  display: flex; align-items: center; gap: 0; padding: 10px 16px;
+  background: #0d1117; border-bottom: 1px solid #1a1a3e;
+}
+.race-step {
+  display: flex; align-items: center; gap: 6px; padding: 4px 12px;
+  border-radius: 4px; font-size: 10px; color: #555; white-space: nowrap;
+  transition: all 0.3s;
+}
+.race-step-circle {
+  width: 18px; height: 18px; border-radius: 50%; border: 2px solid #333;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: bold; color: #555; flex-shrink: 0;
+  transition: all 0.3s;
+}
+.race-step.pending .race-step-circle { border-color: #333; color: #555; }
+.race-step.active .race-step-circle { border-color: #f5a623; color: #f5a623; background: #2a2a1a; }
+.race-step.done .race-step-circle { border-color: #5cb85c; background: #5cb85c; color: #0a0a0f; }
+.race-step.done .race-step-label { color: #5cb85c; }
+.race-step.active .race-step-label { color: #f5a623; }
+.race-step.pending .race-step-label { color: #555; }
+.race-step-arrow { color: #333; font-size: 12px; margin: 0 2px; }
+.race-step-label { font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
 </style>
 </head>
 <body>
@@ -380,6 +405,55 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Monaco', mo
   </div>
   <div class="race-prompt-display" id="race-prompt-display"></div>
   <div class="race-decomp" id="race-decomp" style="display:none;"></div>
+
+  <!-- Cerebras progress stepper -->
+  <div class="race-stepper" id="race-cerebras-stepper">
+    <div class="race-step pending" id="race-cerebras-step-attest-0">
+      <div class="race-step-circle">1</div>
+      <span class="race-step-label">Attest Batch 0</span>
+    </div>
+    <span class="race-step-arrow">>>></span>
+    <div class="race-step pending" id="race-cerebras-step-attest-1">
+      <div class="race-step-circle">2</div>
+      <span class="race-step-label">Attest Batch 1</span>
+    </div>
+    <span class="race-step-arrow">>>></span>
+    <div class="race-step pending" id="race-cerebras-step-confirm">
+      <div class="race-step-circle">3</div>
+      <span class="race-step-label">Confirmation</span>
+    </div>
+    <span class="race-step-arrow">>>></span>
+    <div class="race-step pending" id="race-cerebras-step-escrow">
+      <div class="race-step-circle">4</div>
+      <span class="race-step-label">Escrow Payment</span>
+    </div>
+    <span style="margin-left:12px;font-size:9px;color:#5cb85c;font-weight:bold;">CEREBRAS</span>
+  </div>
+
+  <!-- GPU progress stepper -->
+  <div class="race-stepper" id="race-gpu-stepper">
+    <div class="race-step pending" id="race-gpu-step-attest-0">
+      <div class="race-step-circle">1</div>
+      <span class="race-step-label">Attest Batch 0</span>
+    </div>
+    <span class="race-step-arrow">>>></span>
+    <div class="race-step pending" id="race-gpu-step-attest-1">
+      <div class="race-step-circle">2</div>
+      <span class="race-step-label">Attest Batch 1</span>
+    </div>
+    <span class="race-step-arrow">>>></span>
+    <div class="race-step pending" id="race-gpu-step-confirm">
+      <div class="race-step-circle">3</div>
+      <span class="race-step-label">Confirmation</span>
+    </div>
+    <span class="race-step-arrow">>>></span>
+    <div class="race-step pending" id="race-gpu-step-escrow">
+      <div class="race-step-circle">4</div>
+      <span class="race-step-label">Escrow Payment</span>
+    </div>
+    <span style="margin-left:12px;font-size:9px;color:#e74c3c;font-weight:bold;">GPU</span>
+  </div>
+
   <div class="race-body">
     <!-- Cerebras side -->
     <div class="race-side cerebras">
@@ -1291,6 +1365,18 @@ function handleComparisonStart(data) {
   document.getElementById('race-cerebras-escrow').style.display = '';
   document.getElementById('race-gpu-escrow').style.display = '';
 
+  // Reset all stepper steps to pending
+  ['cerebras', 'gpu'].forEach(side => {
+    for (let i = 0; i < 2; i++) {
+      const el = document.getElementById(`race-${side}-step-attest-${i}`);
+      if (el) { el.className = 'race-step pending'; el.querySelector('.race-step-circle').textContent = i + 1; }
+    }
+    const confirmStep = document.getElementById(`race-${side}-step-confirm`);
+    if (confirmStep) { confirmStep.className = 'race-step pending'; confirmStep.querySelector('.race-step-circle').textContent = '3'; }
+    const escrowStep = document.getElementById(`race-${side}-step-escrow`);
+    if (escrowStep) { escrowStep.className = 'race-step pending'; escrowStep.querySelector('.race-step-circle').textContent = '4'; }
+  });
+
   // Start timer
   if (raceTimerInterval) clearInterval(raceTimerInterval);
   raceTimerInterval = setInterval(updateRaceTimers, 100);
@@ -1435,6 +1521,30 @@ function handleComparisonAttested(data) {
       <span class="race-attest-sig">${(data.signature || '').slice(0, 20)}...</span>
     </div>`;
   }
+
+  // Update stepper: mark this batch attestation step done, activate next
+  const stepEl = document.getElementById(`race-${side}-step-attest-${layerIdx}`);
+  if (stepEl) {
+    stepEl.className = 'race-step done';
+    stepEl.querySelector('.race-step-circle').textContent = '✓';
+  }
+  // Activate next step (next batch attest, or confirmation if last batch)
+  const nextAttest = document.getElementById(`race-${side}-step-attest-${layerIdx + 1}`);
+  if (nextAttest) {
+    nextAttest.className = 'race-step active';
+  } else {
+    // No more batches — mark confirmation as active (attestation = on-chain confirmation)
+    const confirmStep = document.getElementById(`race-${side}-step-confirm`);
+    if (confirmStep) {
+      confirmStep.className = 'race-step done';
+      confirmStep.querySelector('.race-step-circle').textContent = '✓';
+    }
+    // Activate escrow step
+    const escrowStep = document.getElementById(`race-${side}-step-escrow`);
+    if (escrowStep) {
+      escrowStep.className = 'race-step active';
+    }
+  }
 }
 
 function handleComparisonEscrow(data) {
@@ -1462,6 +1572,15 @@ function handleComparisonEscrow(data) {
 
   const walletEl = document.getElementById(`race-${side}-wallet`);
   if (walletEl) walletEl.textContent = `Agent wallet: $${(data.agent_wallet_cents / 100).toFixed(2)}`;
+
+  // Mark escrow step done if this is the last layer (budget fully released)
+  if (remaining <= 0 || releasedPct >= 99) {
+    const escrowStep = document.getElementById(`race-${side}-step-escrow`);
+    if (escrowStep) {
+      escrowStep.className = 'race-step done';
+      escrowStep.querySelector('.race-step-circle').textContent = '✓';
+    }
+  }
 }
 
 // ── Init ──
