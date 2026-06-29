@@ -277,7 +277,7 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Monaco', mo
 <!-- ── Summary bar ── -->
 <div class="summary-bar">
   <div class="stat-cell"><div class="val" id="stat-tasks">0</div><div class="lbl">Tasks</div></div>
-  <div class="stat-cell"><div class="val" id="stat-layers">0</div><div class="lbl">Layers</div></div>
+  <div class="stat-cell"><div class="val" id="stat-layers">0</div><div class="lbl">Batches</div></div>
   <div class="stat-cell"><div class="val" id="stat-confirmed">0</div><div class="lbl">Confirmed</div></div>
   <div class="stat-cell"><div class="val" id="stat-txs">0</div><div class="lbl">Solana Txs</div></div>
   <div class="stat-cell"><div class="val" id="stat-cost">$0.00</div><div class="lbl">Total Cost</div></div>
@@ -757,7 +757,7 @@ function renderTaskQueue(data) {
 
     layerDiv.innerHTML = `
       <div class="layer-header">
-        <span>Layer ${layer.layer} (${taskIds.length} tasks)</span>
+        <span>Batch ${layer.layer} (${taskIds.length} tasks)</span>
         <span class="layer-status pending" id="layer-status-${layer.layer}">pending</span>
       </div>
     `;
@@ -963,7 +963,7 @@ function addConfirmation(data) {
 
   card.innerHTML = `
     <div class="confirmation-header">
-      <span class="confirmation-layer">Layer ${data.layer}</span>
+      <span class="confirmation-layer">Batch ${data.layer}</span>
       <span class="confirmation-sig">${(data.signature || '').slice(0, 24)}...</span>
     </div>
     <div class="confirmation-details">
@@ -1119,7 +1119,7 @@ function handleEscrowRelease(data) {
       </div>`;
     }).join('');
     const existing = proofsDiv.innerHTML;
-    proofsDiv.innerHTML = `<div style="font-size:9px;color:#555;margin-bottom:3px;">Layer ${layer} releases:</div>` + proofHtml + existing;
+    proofsDiv.innerHTML = `<div style="font-size:9px;color:#555;margin-bottom:3px;">Batch ${layer} releases:</div>` + proofHtml + existing;
   }
 }
 
@@ -1252,7 +1252,7 @@ function handleComparisonStart(data) {
     // Cerebras side
     let cHtml = `<div class="race-layer-group" id="race-cerebras-layer-${layer.layer}">
       <div class="race-layer-header">
-        <span>Layer ${layer.layer}: ${escapeHtml(layer.name)}</span>
+        <span>Batch ${layer.layer}: ${escapeHtml(layer.name)}</span>
         <span class="race-layer-status dispatching" id="race-cerebras-layer-${layer.layer}-status">dispatching</span>
       </div>`;
     (layer.tasks || []).forEach(task => {
@@ -1271,7 +1271,7 @@ function handleComparisonStart(data) {
     // GPU side
     let gHtml = `<div class="race-layer-group" id="race-gpu-layer-${layer.layer}">
       <div class="race-layer-header">
-        <span>Layer ${layer.layer}: ${escapeHtml(layer.name)}</span>
+        <span>Batch ${layer.layer}: ${escapeHtml(layer.name)}</span>
         <span class="race-layer-status dispatching" id="race-gpu-layer-${layer.layer}-status">dispatching</span>
       </div>`;
     (layer.tasks || []).forEach(task => {
@@ -1431,7 +1431,7 @@ function handleComparisonAttested(data) {
     const cost = (data.cost_cents / 100).toFixed(2);
     attestDiv.innerHTML = `<div class="race-attest">
       <span class="race-attest-icon">✅</span>
-      <span class="race-attest-detail">Layer ${layerIdx} attested · ${data.verified_count}/${data.task_count} verified · ${latency}s · $${cost}</span>
+      <span class="race-attest-detail">Batch ${layerIdx} attested · ${data.verified_count}/${data.task_count} verified · ${latency}s · $${cost}</span>
       <span class="race-attest-sig">${(data.signature || '').slice(0, 20)}...</span>
     </div>`;
   }
