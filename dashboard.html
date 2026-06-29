@@ -202,6 +202,55 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Monaco', mo
 .race-speedup.cerebras { color: #5cb85c; }
 .race-speedup.gpu { color: #e74c3c; }
 .race-finish-detail { font-size: 11px; color: #8a8a9a; margin-top: 4px; }
+
+/* Race decomposition bar (shared) */
+.race-decomp {
+  padding: 8px 16px; background: #0d1117; border-bottom: 1px solid #1a1a3e;
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+}
+.race-decomp-label { font-size: 9px; color: #8a8a9a; text-transform: uppercase; letter-spacing: 1px; }
+.race-decomp-layer {
+  display: flex; align-items: center; gap: 6px; padding: 4px 10px;
+  background: #1a1a2e; border-radius: 4px; border: 1px solid #333;
+}
+.race-decomp-layer-num { font-size: 14px; font-weight: bold; color: #f5a623; }
+.race-decomp-layer-name { font-size: 10px; color: #e0e0e0; }
+.race-decomp-layer-tasks { font-size: 9px; color: #5bc0de; }
+.race-decomp-arrow { color: #333; font-size: 14px; }
+
+/* Race layer group in task list */
+.race-layer-group { margin-bottom: 10px; }
+.race-layer-header {
+  font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+  padding: 4px 8px; border-radius: 3px; margin-bottom: 6px; display: flex; justify-content: space-between;
+}
+.race-side.cerebras .race-layer-header { background: #0d1f0d; color: #5cb85c; border-left: 2px solid #5cb85c; }
+.race-side.gpu .race-layer-header { background: #1f0d0d; color: #e74c3c; border-left: 2px solid #e74c3c; }
+.race-layer-status { font-size: 9px; padding: 1px 6px; border-radius: 3px; font-weight: normal; }
+.race-layer-status.dispatching { background: #2a2a1a; color: #f5a623; }
+.race-layer-status.attested { background: #0d1f0d; color: #5cb85c; }
+
+/* Race attestation chip */
+.race-attest {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin: 4px 0;
+  background: #111827; border-radius: 4px; border-left: 3px solid #5cb85c;
+  font-size: 10px;
+}
+.race-attest-icon { font-size: 14px; }
+.race-attest-detail { color: #aaa; }
+.race-attest-sig { color: #555; font-size: 9px; }
+
+/* Race escrow bar */
+.race-escrow {
+  padding: 8px; margin-top: 6px; background: #0d1117; border-radius: 4px; border: 1px solid #1a1a3e;
+}
+.race-escrow-label { font-size: 9px; color: #8a8a9a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.race-escrow-bar { height: 8px; background: #1a1a2e; border-radius: 4px; overflow: hidden; }
+.race-escrow-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+.race-side.cerebras .race-escrow-fill { background: linear-gradient(90deg, #5cb85c, #f5a623); }
+.race-side.gpu .race-escrow-fill { background: linear-gradient(90deg, #e74c3c, #f5a623); }
+.race-escrow-detail { display: flex; justify-content: space-between; font-size: 9px; color: #666; margin-top: 3px; }
+.race-escrow-wallet { font-size: 10px; color: #f5a623; margin-top: 3px; }
 </style>
 </head>
 <body>
@@ -330,6 +379,7 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Monaco', mo
     <button class="race-close" onclick="closeRace()">✕ Close</button>
   </div>
   <div class="race-prompt-display" id="race-prompt-display"></div>
+  <div class="race-decomp" id="race-decomp" style="display:none;"></div>
   <div class="race-body">
     <!-- Cerebras side -->
     <div class="race-side cerebras">
@@ -341,6 +391,15 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Monaco', mo
         <div class="race-timer" id="race-cerebras-timer">0.0s</div>
       </div>
       <div class="race-tasks" id="race-cerebras-tasks"></div>
+      <div class="race-escrow" id="race-cerebras-escrow" style="display:none;">
+        <div class="race-escrow-label">Escrow & Agent Wallet</div>
+        <div class="race-escrow-bar"><div class="race-escrow-fill" id="race-cerebras-escrow-fill" style="width:100%;"></div></div>
+        <div class="race-escrow-detail">
+          <span id="race-cerebras-escrow-released">Released: $0.00</span>
+          <span id="race-cerebras-escrow-budget">Budget: $5.00</span>
+        </div>
+        <div class="race-escrow-wallet" id="race-cerebras-wallet">Agent wallet: $0.00</div>
+      </div>
     </div>
     <!-- GPU side -->
     <div class="race-side gpu">
@@ -352,6 +411,15 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Monaco', mo
         <div class="race-timer" id="race-gpu-timer">0.0s</div>
       </div>
       <div class="race-tasks" id="race-gpu-tasks"></div>
+      <div class="race-escrow" id="race-gpu-escrow" style="display:none;">
+        <div class="race-escrow-label">Escrow & Agent Wallet</div>
+        <div class="race-escrow-bar"><div class="race-escrow-fill" id="race-gpu-escrow-fill" style="width:100%;"></div></div>
+        <div class="race-escrow-detail">
+          <span id="race-gpu-escrow-released">Released: $0.00</span>
+          <span id="race-gpu-escrow-budget">Budget: $5.00</span>
+        </div>
+        <div class="race-escrow-wallet" id="race-gpu-wallet">Agent wallet: $0.00</div>
+      </div>
     </div>
   </div>
   <div class="race-finish-banner" id="race-finish-banner">
@@ -611,6 +679,15 @@ function handleMessage(msg) {
   }
   else if (msg.type === 'comparison_progress') {
     handleComparisonProgress(msg.data);
+  }
+  else if (msg.type === 'comparison_layer') {
+    handleComparisonLayer(msg.data);
+  }
+  else if (msg.type === 'comparison_attested') {
+    handleComparisonAttested(msg.data);
+  }
+  else if (msg.type === 'comparison_escrow') {
+    handleComparisonEscrow(msg.data);
   }
   else if (msg.type === 'comparison_complete') {
     handleComparisonComplete(msg.data);
@@ -1120,10 +1197,11 @@ function closeRace() {
 
 function handleComparisonStart(data) {
   raceState = {
-    tasks: data.tasks || [],
-    cerebras: {tasks: {}, elapsed: 0, done: false, totalTime: 0},
-    gpu: {tasks: {}, elapsed: 0, done: false, totalTime: 0},
+    layers: data.layers || [],
+    cerebras: {tasks: {}, layers: {}, elapsed: 0, done: false, totalTime: 0, wallet: 0, released: 0},
+    gpu: {tasks: {}, layers: {}, elapsed: 0, done: false, totalTime: 0, wallet: 0, released: 0},
     startTime: Date.now(),
+    budget: data.budget_cents || 500,
   };
 
   // Show overlay
@@ -1144,28 +1222,74 @@ function handleComparisonStart(data) {
   const promptDiv = document.getElementById('race-prompt-display');
   if (promptDiv) {
     const userPrompt = document.getElementById('user-prompt').value.trim();
-    promptDiv.textContent = userPrompt ? `Prompt: ${userPrompt.slice(0, 200)}` : 'Default benchmark tasks (Cerebras topic)';
+    promptDiv.textContent = userPrompt ? `Prompt: ${userPrompt.slice(0, 200)}` : 'Default: Cerebras topic decomposition';
   }
 
-  // Initialize task cards on both sides
+  // Render decomposition bar (shared)
+  const decompDiv = document.getElementById('race-decomp');
+  if (decompDiv && data.layers && data.layers.length > 0) {
+    decompDiv.style.display = 'flex';
+    let html = '<span class="race-decomp-label">Decomposition:</span>';
+    data.layers.forEach((layer, i) => {
+      if (i > 0) html += '<span class="race-decomp-arrow">>>></span>';
+      const taskCount = layer.tasks ? layer.tasks.length : 0;
+      html += `<div class="race-decomp-layer">
+        <span class="race-decomp-layer-num">L${layer.layer}</span>
+        <span class="race-decomp-layer-name">${escapeHtml(layer.name)}</span>
+        <span class="race-decomp-layer-tasks">${taskCount} tasks</span>
+      </div>`;
+    });
+    decompDiv.innerHTML = html;
+  }
+
+  // Initialize task cards on both sides, grouped by layer
   const cTasks = document.getElementById('race-cerebras-tasks');
   const gTasks = document.getElementById('race-gpu-tasks');
   cTasks.innerHTML = '';
   gTasks.innerHTML = '';
 
-  raceState.tasks.forEach(task => {
-    const cardHtml = (side) => `
-      <div class="race-task-card" id="race-${side}-${task.id}">
+  (data.layers || []).forEach(layer => {
+    // Cerebras side
+    let cHtml = `<div class="race-layer-group" id="race-cerebras-layer-${layer.layer}">
+      <div class="race-layer-header">
+        <span>Layer ${layer.layer}: ${escapeHtml(layer.name)}</span>
+        <span class="race-layer-status dispatching" id="race-cerebras-layer-${layer.layer}-status">dispatching</span>
+      </div>`;
+    (layer.tasks || []).forEach(task => {
+      cHtml += `<div class="race-task-card" id="race-cerebras-${task.id}">
         <div class="race-task-name">${escapeHtml(task.name)}
-          <span class="race-task-latency" id="race-${side}-${task.id}-latency"></span>
+          <span class="race-task-latency" id="race-cerebras-${task.id}-latency"></span>
         </div>
-        <span class="race-task-status pending" id="race-${side}-${task.id}-status">pending</span>
-        <div class="race-task-output" id="race-${side}-${task.id}-output" style="display:none;"></div>
-      </div>
-    `;
-    cTasks.insertAdjacentHTML('beforeend', cardHtml('cerebras'));
-    gTasks.insertAdjacentHTML('beforeend', cardHtml('gpu'));
+        <span class="race-task-status pending" id="race-cerebras-${task.id}-status">pending</span>
+        <div class="race-task-output" id="race-cerebras-${task.id}-output" style="display:none;"></div>
+      </div>`;
+    });
+    // Attestation placeholder
+    cHtml += `<div id="race-cerebras-attest-${layer.layer}"></div></div>`;
+    cTasks.insertAdjacentHTML('beforeend', cHtml);
+
+    // GPU side
+    let gHtml = `<div class="race-layer-group" id="race-gpu-layer-${layer.layer}">
+      <div class="race-layer-header">
+        <span>Layer ${layer.layer}: ${escapeHtml(layer.name)}</span>
+        <span class="race-layer-status dispatching" id="race-gpu-layer-${layer.layer}-status">dispatching</span>
+      </div>`;
+    (layer.tasks || []).forEach(task => {
+      gHtml += `<div class="race-task-card" id="race-gpu-${task.id}">
+        <div class="race-task-name">${escapeHtml(task.name)}
+          <span class="race-task-latency" id="race-gpu-${task.id}-latency"></span>
+        </div>
+        <span class="race-task-status pending" id="race-gpu-${task.id}-status">pending</span>
+        <div class="race-task-output" id="race-gpu-${task.id}-output" style="display:none;"></div>
+      </div>`;
+    });
+    gHtml += `<div id="race-gpu-attest-${layer.layer}"></div></div>`;
+    gTasks.insertAdjacentHTML('beforeend', gHtml);
   });
+
+  // Show escrow panels
+  document.getElementById('race-cerebras-escrow').style.display = '';
+  document.getElementById('race-gpu-escrow').style.display = '';
 
   // Start timer
   if (raceTimerInterval) clearInterval(raceTimerInterval);
@@ -1275,6 +1399,69 @@ function handleComparisonComplete(data) {
   // Re-enable race button
   const btn = document.getElementById('btn-race');
   if (btn) { btn.textContent = '🏁 Race'; btn.disabled = false; }
+}
+
+function handleComparisonLayer(data) {
+  if (!raceState) return;
+  const side = data.side;
+  const layerIdx = data.layer;
+  const statusBadge = document.getElementById(`race-${side}-layer-${layerIdx}-status`);
+  if (statusBadge) {
+    statusBadge.className = 'race-layer-status dispatching';
+    statusBadge.textContent = `${data.stage || 'dispatching'} (${data.task_count} tasks)`;
+  }
+}
+
+function handleComparisonAttested(data) {
+  if (!raceState) return;
+  const side = data.side;
+  const layerIdx = data.layer;
+
+  // Update layer status badge
+  const statusBadge = document.getElementById(`race-${side}-layer-${layerIdx}-status`);
+  if (statusBadge) {
+    statusBadge.className = 'race-layer-status attested';
+    statusBadge.textContent = `attested (${data.verified_count}/${data.task_count})`;
+  }
+
+  // Add attestation chip
+  const attestDiv = document.getElementById(`race-${side}-attest-${layerIdx}`);
+  if (attestDiv) {
+    const latency = (data.latency_ms / 1000).toFixed(1);
+    const cost = (data.cost_cents / 100).toFixed(2);
+    attestDiv.innerHTML = `<div class="race-attest">
+      <span class="race-attest-icon">✅</span>
+      <span class="race-attest-detail">Layer ${layerIdx} attested · ${data.verified_count}/${data.task_count} verified · ${latency}s · $${cost}</span>
+      <span class="race-attest-sig">${(data.signature || '').slice(0, 20)}...</span>
+    </div>`;
+  }
+}
+
+function handleComparisonEscrow(data) {
+  if (!raceState) return;
+  const side = data.side;
+  const sideState = raceState[side];
+  if (!sideState) return;
+
+  sideState.released = data.released_cents;
+  sideState.wallet = data.agent_wallet_cents;
+
+  const totalBudget = data.total_budget_cents || raceState.budget || 500;
+  const remaining = data.remaining_budget_cents;
+  const releasedPct = totalBudget > 0 ? ((totalBudget - remaining) / totalBudget) * 100 : 0;
+
+  // Update escrow bar
+  const fill = document.getElementById(`race-${side}-escrow-fill`);
+  if (fill) fill.style.width = releasedPct + '%';
+
+  const releasedEl = document.getElementById(`race-${side}-escrow-released`);
+  if (releasedEl) releasedEl.textContent = `Released: $${(data.released_cents / 100).toFixed(2)}`;
+
+  const budgetEl = document.getElementById(`race-${side}-escrow-budget`);
+  if (budgetEl) budgetEl.textContent = `Budget: $${(totalBudget / 100).toFixed(2)}`;
+
+  const walletEl = document.getElementById(`race-${side}-wallet`);
+  if (walletEl) walletEl.textContent = `Agent wallet: $${(data.agent_wallet_cents / 100).toFixed(2)}`;
 }
 
 // ── Init ──

@@ -626,8 +626,9 @@ class MultiAgentBridge:
         self.clients -= dead
 
     async def run_comparison_race(self, prompt: str, ws):
-        """Run Cerebras and GPU GLM simultaneously, streaming live progress."""
+        """Run Cerebras and GPU GLM simultaneously, with layers, attestation, escrow."""
         from agent_client import load_api_keys, call_glm, call_gemma4, MODEL_CONFIG
+        import hashlib
         import time as _time
 
         keys = load_api_keys()
@@ -635,103 +636,184 @@ class MultiAgentBridge:
             await self._send_to(ws, {"type": "comparison_error", "data": {"error": "Missing API keys for one or both providers"}})
             return
 
-        # Use benchmark tasks or decompose the user's prompt
-        tasks = self._get_comparison_tasks(prompt)
+        # Build layered task structure
+        layers = self._get_comparison_layers(prompt)
 
-        # Announce the race
+        # Announce the race with full layer structure
         await self._broadcast({
             "type": "comparison_start",
             "data": {
-                "tasks": [{"id": t["id"], "name": t["name"], "prompt": t["prompt"][:100]} for t in tasks],
+                "layers": [
+                    {
+                        "layer": l["layer"],
+                        "name": l["name"],
+                        "tasks": [{"id": t["id"], "name": t["name"]} for t in l["tasks"]],
+                    }
+                    for l in layers
+                ],
                 "cerebras_model": MODEL_CONFIG["gemma4"]["model"],
                 "glm_model": MODEL_CONFIG["glm"]["model"],
+                "budget_cents": 500,  # $5.00 each side
             }
         })
 
         SYSTEM = "You are a research agent. Provide detailed, structured findings. Be thorough and specific."
 
-        async def run_side(provider, api_key, caller, label, color):
-            """Run all tasks on one provider, streaming progress."""
+        async def run_side(provider, api_key, caller, label):
+            """Run all layers on one provider, streaming progress + attestation + escrow."""
             config = MODEL_CONFIG[provider]
-            results = []
+            all_results = []
+            all_layer_attestations = []
             start = _time.time()
+            budget_remaining = 500  # cents
+            agent_wallet = 0  # cents
 
-            for task in tasks:
-                # Announce task starting
+            for layer in layers:
+                layer_idx = layer["layer"]
+                layer_tasks = layer["tasks"]
+                layer_results = []
+
+                # Announce layer starting
                 await self._broadcast({
-                    "type": "comparison_progress",
+                    "type": "comparison_layer",
                     "data": {
                         "side": label,
-                        "task_id": task["id"],
-                        "task_name": task["name"],
-                        "stage": "starting",
+                        "layer": layer_idx,
+                        "layer_name": layer["name"],
+                        "stage": "dispatching",
+                        "task_count": len(layer_tasks),
                         "elapsed_s": _time.time() - start,
                     }
                 })
 
-                t_start = _time.time()
-                try:
-                    result = await caller(
-                        api_key=api_key,
-                        system_prompt=SYSTEM,
-                        user_prompt=task["prompt"],
-                        config=config,
-                        agent_id=f"race-{label}",
-                        ws=None,
-                        task_id=task["id"],
-                    )
-                    elapsed = _time.time() - t_start
-                    ok = result.get("ok", False)
-                    content = result.get("content", "")
-
-                    task_result = {
-                        "task_id": task["id"],
-                        "task_name": task["name"],
-                        "ok": ok,
-                        "latency_ms": result.get("latency_ms", elapsed * 1000),
-                        "latency_s": elapsed,
-                        "content_length": len(content),
-                        "content_preview": content[:500],
-                        "provider": provider,
-                    }
-                    results.append(task_result)
-
-                    # Stream completion
+                # Run all tasks in this layer (sequentially within a side)
+                for task in layer_tasks:
                     await self._broadcast({
                         "type": "comparison_progress",
                         "data": {
                             "side": label,
+                            "layer": layer_idx,
                             "task_id": task["id"],
                             "task_name": task["name"],
-                            "stage": "done",
+                            "stage": "starting",
+                            "elapsed_s": _time.time() - start,
+                        }
+                    })
+
+                    t_start = _time.time()
+                    try:
+                        result = await caller(
+                            api_key=api_key,
+                            system_prompt=SYSTEM,
+                            user_prompt=task["prompt"],
+                            config=config,
+                            agent_id=f"race-{label}",
+                            ws=None,
+                            task_id=task["id"],
+                        )
+                        elapsed = _time.time() - t_start
+                        ok = result.get("ok", False)
+                        content = result.get("content", "")
+
+                        task_result = {
+                            "task_id": task["id"],
+                            "task_name": task["name"],
                             "ok": ok,
+                            "latency_ms": result.get("latency_ms", elapsed * 1000),
                             "latency_s": elapsed,
-                            "latency_ms": task_result["latency_ms"],
-                            "content_preview": content[:500],
                             "content_length": len(content),
-                            "elapsed_s": _time.time() - start,
+                            "content_preview": content[:500],
+                            "layer": layer_idx,
                         }
-                    })
-                except Exception as e:
-                    elapsed = _time.time() - t_start
-                    results.append({
-                        "task_id": task["id"],
-                        "task_name": task["name"],
-                        "ok": False,
-                        "latency_ms": elapsed * 1000,
-                        "error": str(e),
-                    })
-                    await self._broadcast({
-                        "type": "comparison_progress",
-                        "data": {
-                            "side": label,
+                        layer_results.append(task_result)
+                        all_results.append(task_result)
+
+                        await self._broadcast({
+                            "type": "comparison_progress",
+                            "data": {
+                                "side": label,
+                                "layer": layer_idx,
+                                "task_id": task["id"],
+                                "task_name": task["name"],
+                                "stage": "done",
+                                "ok": ok,
+                                "latency_s": elapsed,
+                                "latency_ms": task_result["latency_ms"],
+                                "content_preview": content[:500],
+                                "content_length": len(content),
+                                "elapsed_s": _time.time() - start,
+                            }
+                        })
+                    except Exception as e:
+                        elapsed = _time.time() - t_start
+                        layer_results.append({
                             "task_id": task["id"],
                             "task_name": task["name"],
-                            "stage": "error",
+                            "ok": False,
+                            "latency_ms": elapsed * 1000,
                             "error": str(e),
-                            "elapsed_s": _time.time() - start,
-                        }
-                    })
+                            "layer": layer_idx,
+                        })
+                        all_results.append(layer_results[-1])
+                        await self._broadcast({
+                            "type": "comparison_progress",
+                            "data": {
+                                "side": label,
+                                "layer": layer_idx,
+                                "task_id": task["id"],
+                                "task_name": task["name"],
+                                "stage": "error",
+                                "error": str(e),
+                                "elapsed_s": _time.time() - start,
+                            }
+                        })
+
+                # Layer complete — verify + attest
+                layer_latency = sum(r.get("latency_ms", 0) for r in layer_results)
+                verified_count = sum(1 for r in layer_results if r.get("ok"))
+                cost_cents = min(50, budget_remaining)  # $0.50 per layer
+                budget_remaining -= cost_cents
+                agent_wallet += cost_cents
+
+                # Mock Solana signature
+                sig_input = f"{label}-{layer_idx}-{_time.time()}"
+                sig = hashlib.sha256(sig_input.encode()).hexdigest()[:44]
+
+                attestation = {
+                    "layer": layer_idx,
+                    "layer_name": layer["name"],
+                    "task_count": len(layer_results),
+                    "verified_count": verified_count,
+                    "latency_ms": layer_latency,
+                    "cost_cents": cost_cents,
+                    "signature": sig,
+                    "remaining_budget_cents": budget_remaining,
+                    "agent_wallet_cents": agent_wallet,
+                }
+                all_layer_attestations.append(attestation)
+
+                await self._broadcast({
+                    "type": "comparison_attested",
+                    "data": {
+                        "side": label,
+                        **attestation,
+                        "elapsed_s": _time.time() - start,
+                    }
+                })
+
+                # Escrow release
+                await self._broadcast({
+                    "type": "comparison_escrow",
+                    "data": {
+                        "side": label,
+                        "layer": layer_idx,
+                        "released_cents": cost_cents,
+                        "agent_wallet_cents": agent_wallet,
+                        "remaining_budget_cents": budget_remaining,
+                        "total_budget_cents": 500,
+                        "signature": sig,
+                    }
+                })
 
             total = _time.time() - start
             return {
@@ -740,16 +822,19 @@ class MultiAgentBridge:
                 "label": label,
                 "total_time_s": total,
                 "total_time_ms": total * 1000,
-                "tasks": results,
-                "successful": sum(1 for r in results if r["ok"]),
+                "tasks": all_results,
+                "layers": all_layer_attestations,
+                "successful": sum(1 for r in all_results if r.get("ok")),
+                "total_cost_cents": 500 - budget_remaining,
+                "agent_wallet_cents": agent_wallet,
             }
 
         # Run both sides simultaneously
         cerebras_task = asyncio.create_task(
-            run_side("gemma4", keys["gemma4"], call_gemma4, "cerebras", "#5cb85c")
+            run_side("gemma4", keys["gemma4"], call_gemma4, "cerebras")
         )
         glm_task = asyncio.create_task(
-            run_side("glm", keys["glm"], call_glm, "gpu", "#e74c3c")
+            run_side("glm", keys["glm"], call_glm, "gpu")
         )
 
         c_result, g_result = await asyncio.gather(cerebras_task, glm_task)
@@ -763,41 +848,73 @@ class MultiAgentBridge:
                 "gpu": g_result,
                 "total_speedup": speedup,
                 "winner": "cerebras" if speedup > 1 else "gpu",
+                "layers": [
+                    {"layer": l["layer"], "name": l["name"]} for l in layers
+                ],
             }
         })
         log.info(f"Comparison race done: Cerebras {c_result['total_time_s']:.1f}s vs GPU {g_result['total_time_s']:.1f}s = {speedup:.1f}x")
 
-    def _get_comparison_tasks(self, prompt: str) -> list:
-        """Get tasks for the comparison. Use user's prompt or fall back to defaults."""
+    def _get_comparison_layers(self, prompt: str) -> list:
+        """Decompose prompt into layered DAG structure for the race."""
         if prompt and len(prompt) > 20:
             return [
                 {
-                    "id": "race_00",
-                    "name": "Research topic (part 1)",
-                    "prompt": prompt,
+                    "layer": 0,
+                    "name": "Parallel Research",
+                    "tasks": [
+                        {
+                            "id": "race_00",
+                            "name": "Research: Architecture & Technology",
+                            "prompt": f"Research the technical architecture and key innovations of: {prompt}. Focus on specs, design choices, and performance. Return a structured summary.",
+                        },
+                        {
+                            "id": "race_01",
+                            "name": "Research: Market & Competition",
+                            "prompt": f"Research the market positioning and competitive landscape for: {prompt}. Cover pricing, alternatives, and key differentiators. Return a structured summary.",
+                        },
+                    ],
                 },
                 {
-                    "id": "race_01",
-                    "name": "Analysis & synthesis",
-                    "prompt": f"Analyze and synthesize key findings from this topic: {prompt[:200]}. Provide a structured summary with key points, implications, and conclusions.",
+                    "layer": 1,
+                    "name": "Synthesis & Analysis",
+                    "tasks": [
+                        {
+                            "id": "race_02",
+                            "name": "Synthesis: Competitive Brief",
+                            "prompt": f"Synthesize the research findings about {prompt[:200]} into a comprehensive competitive brief. Combine technical and market analysis into actionable insights.",
+                        },
+                    ],
                 },
             ]
-        # Default benchmark tasks
+        # Default Cerebras-themed tasks
         return [
             {
-                "id": "race_00",
-                "name": "Research Cerebras wafer-scale architecture",
-                "prompt": "Research Cerebras Systems' CS-3 wafer-scale chip architecture. Find specs, performance benchmarks, and key technical innovations. Return a structured summary.",
+                "layer": 0,
+                "name": "Parallel Research",
+                "tasks": [
+                    {
+                        "id": "race_00",
+                        "name": "Research Cerebras CS-3 wafer-scale architecture",
+                        "prompt": "Research Cerebras Systems' CS-3 wafer-scale chip architecture. Find specs, performance benchmarks, and key technical innovations. Return a structured summary.",
+                    },
+                    {
+                        "id": "race_01",
+                        "name": "Research Cerebras Inference API & pricing",
+                        "prompt": "Research Cerebras Inference API, supported models, pricing ($0.25/M tokens), and how it achieves latency advantages. Return a structured summary.",
+                    },
+                ],
             },
             {
-                "id": "race_01",
-                "name": "Research Cerebras inference API",
-                "prompt": "Research Cerebras Inference API and software stack. How does it achieve token-level latency advantages? What models are supported? Return a structured summary.",
-            },
-            {
-                "id": "race_02",
-                "name": "Competitive positioning brief",
-                "prompt": "Create a competitive positioning brief comparing Cerebras to GPU-based inference (NVIDIA, OpenAI). Cover speed, cost, and architecture differences.",
+                "layer": 1,
+                "name": "Synthesis & Analysis",
+                "tasks": [
+                    {
+                        "id": "race_02",
+                        "name": "Competitive positioning brief",
+                        "prompt": "Create a competitive positioning brief comparing Cerebras to GPU-based inference (NVIDIA, OpenAI). Cover speed, cost, and architecture differences. Use the research findings to support your analysis.",
+                    },
+                ],
             },
         ]
 
