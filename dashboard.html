@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Agent Orchestrator</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Monaco', monospace; font-size: 13px; }
+
+/* ── Header ── */
+.header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;
+  background: linear-gradient(135deg, #1a1a2e, #16213e); border-bottom: 1px solid #0f3460; }
+.header h1 { font-size: 16px; color: #e94560; }
+.header .controls { display: flex; gap: 8px; align-items: center; }
+.header input { padding: 5px 8px; background: #1a1a2e; border: 1px solid #333; color: #e0e0e0;
+  border-radius: 4px; font-family: inherit; font-size: 11px; width: 200px; }
+.header button { padding: 5px 14px; border: none; border-radius: 4px; cursor: pointer;
+  font-family: inherit; font-size: 11px; font-weight: bold; }
+.btn-connect { background: #0f3460; color: #5bc0de; }
+.btn-connect:hover { background: #1a4a7a; }
+.btn-action { background: #e94560; color: white; }
+.btn-action:hover { background: #c73e54; }
+.btn-action:disabled { background: #333; color: #666; cursor: not-allowed; }
+.btn-small { padding: 3px 10px; font-size: 10px; background: #0f3460; color: #5bc0de;
+  border: none; border-radius: 3px; cursor: pointer; }
+.btn-small:hover { background: #1a4a7a; }
+
+/* ── Summary bar ── */
+.summary-bar { display: flex; gap: 0; padding: 0; background: #0d1117; border-bottom: 1px solid #1a1a3e; }
+.stat-cell { flex: 1; padding: 8px 12px; text-align: center; border-right: 1px solid #1a1a3e; }
+.stat-cell:last-child { border-right: none; }
+.stat-cell .val { font-size: 18px; font-weight: bold; color: #e94560; }
+.stat-cell .lbl { font-size: 9px; color: #8a8a9a; text-transform: uppercase; margin-top: 2px; }
+
+/* ── Three-panel layout ── */
+.main { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; height: calc(100vh - 140px); overflow: hidden; }
+.panel { background: #0d1117; border-right: 1px solid #1a1a3e; display: flex; flex-direction: column; overflow: hidden; }
+.panel:last-child { border-right: none; }
+.panel-header { padding: 8px 12px; background: #111827; border-bottom: 1px solid #1a1a3e;
+  font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #8a8a9a;
+  display: flex; justify-content: space-between; align-items: center; }
+.panel-header .badge { padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: normal; }
+.panel-body { flex: 1; overflow-y: auto; padding: 8px; }
+
+/* ── Section 1: Agent Prompts ── */
+.agent-prompt { margin-bottom: 8px; padding: 8px; background: #111827; border-radius: 6px;
+  border: 1px solid #1a1a3e; transition: border-color 0.3s; }
+.agent-prompt.active { border-color: #0f3460; }
+.agent-prompt.submitted { border-color: #2d6a2d; }
+.agent-prompt.failed { border-color: #8b0000; }
+.agent-prompt-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.agent-label { font-size: 11px; font-weight: bold; color: #5bc0de; }
+.agent-status { font-size: 9px; padding: 2px 6px; border-radius: 3px; }
+.agent-status.idle { background: #1a1a2e; color: #666; }
+.agent-status.busy { background: #1a2332; color: #5bc0de; }
+.agent-status.done { background: #0d1f0d; color: #5cb85c; }
+.agent-status.failed { background: #2e1a1a; color: #e74c3c; }
+.agent-prompt textarea { width: 100%; background: #0a0a0f; border: 1px solid #1a1a3e; color: #e0e0e0;
+  border-radius: 4px; padding: 6px 8px; font-family: inherit; font-size: 11px; resize: vertical;
+  min-height: 36px; }
+.agent-prompt textarea:focus { outline: none; border-color: #0f3460; }
+.agent-prompt-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+.agent-prompt .verify-info { font-size: 9px; color: #555; }
+
+/* ── Section 2: Task Queue / Batching ── */
+.layer-group { margin-bottom: 12px; }
+.layer-header { font-size: 11px; color: #8a8a9a; margin-bottom: 4px; display: flex;
+  justify-content: space-between; align-items: center; }
+.layer-header .layer-status { font-size: 9px; padding: 2px 6px; border-radius: 3px; }
+.layer-status.pending { background: #1a1a2e; color: #666; }
+.layer-status.collecting { background: #1a2332; color: #5bc0de; }
+.layer-status.verifying { background: #2a1a2e; color: #c77dff; }
+.layer-status.ready { background: #1a2e1a; color: #5cb85c; }
+.layer-status.attesting { background: #2a2a1a; color: #f5a623; }
+.layer-status.attested { background: #0d1f0d; color: #5cb85c; }
+.layer-status.failed { background: #2e1a1a; color: #e74c3c; }
+.task-card { padding: 6px 8px; margin-bottom: 4px; background: #111827; border-radius: 4px;
+  border-left: 3px solid #333; font-size: 11px; transition: all 0.3s; }
+.task-card.pending { border-left-color: #333; }
+.task-card.dispatched { border-left-color: #0f3460; background: #0d1520; }
+.task-card.submitted { border-left-color: #533483; background: #150d20; }
+.task-card.verified { border-left-color: #2d6a2d; background: #0d150d; }
+.task-card.confirmed { border-left-color: #5cb85c; background: #0a120a; }
+.task-card.failed { border-left-color: #8b0000; background: #150808; }
+.task-card .task-id { font-weight: bold; color: #e0e0e0; }
+.task-card .task-agent { color: #5bc0de; font-size: 10px; }
+.task-card .task-verify { color: #666; font-size: 9px; }
+.task-card .task-time { color: #555; font-size: 9px; float: right; }
+.batch-summary { padding: 6px 8px; margin-top: 4px; background: #0a1a0a; border-radius: 4px;
+  border: 1px solid #2d6a2d; font-size: 10px; color: #5cb85c; }
+
+/* ── Section 3: Confirmations ── */
+.confirmation-card { padding: 10px; margin-bottom: 8px; background: #111827; border-radius: 6px;
+  border-left: 3px solid #5cb85c; }
+.confirmation-card.pending { border-left-color: #f5a623; opacity: 0.7; }
+.confirmation-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.confirmation-layer { font-size: 12px; font-weight: bold; color: #5cb85c; }
+.confirmation-sig { font-size: 10px; color: #8a8a9a; }
+.confirmation-details { font-size: 10px; color: #aaa; line-height: 1.5; }
+.confirmation-details .label { color: #666; }
+.confirmation-tasks { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+.confirmation-task { padding: 1px 6px; background: #0a1a0a; border-radius: 3px; font-size: 9px; color: #5cb85c; }
+.confirmation-empty { text-align: center; padding: 40px 20px; color: #333; font-size: 12px; }
+.cost-display { font-size: 16px; color: #e94560; font-weight: bold; }
+.savings-badge { display: inline-block; padding: 2px 8px; background: #0d1f0d; border-radius: 3px;
+  font-size: 10px; color: #5cb85c; margin-top: 4px; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0a0a0f; }
+::-webkit-scrollbar-thumb { background: #1a1a3e; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #2a2a4e; }
+
+/* ── Task Results ── */
+.task-result { margin-top: 6px; padding: 6px; background: #0a0a0f; border-radius: 4px;
+  border: 1px solid #1a1a3e; font-size: 10px; color: #aaa; max-height: 120px; overflow-y: auto;
+  white-space: pre-wrap; word-wrap: break-word; }
+.task-result-label { font-size: 9px; color: #5cb85c; font-weight: bold; margin-bottom: 2px; }
+.task-card .task-result-inline { margin-top: 4px; padding: 4px 6px; background: #0a0a0f; border-radius: 3px;
+  font-size: 9px; color: #aaa; max-height: 80px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;
+  border-top: 1px solid #1a1a3e; }
+.task-result-empty { color: #555; font-style: italic; }
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<div class="header">
+  <h1>Multi-Agent Orchestrator</h1>
+  <div class="controls">
+    <input type="text" id="ws-url" value="ws://localhost:8765" placeholder="WebSocket URL">
+    <button id="btn-connect" class="btn-connect" onclick="connectWS()">Connect</button>
+    <button id="btn-plan" class="btn-action" onclick="planAndSubmit()" disabled>Plan &amp; Submit</button>
+    <button id="btn-start" class="btn-action" onclick="startPipeline()" disabled>Start Pipeline</button>
+    <button id="btn-bench" class="btn-small" onclick="runBenchmark()">⚡ Benchmark</button>
+  </div>
+</div>
+
+<!-- ── User Prompt ── -->
+<div style="padding:10px;background:#0d1117;border-bottom:1px solid #1a1a3e;">
+  <textarea id="user-prompt" placeholder="Describe what you want the agents to do... (e.g. Research IBM sub-nm chip and Huawei LogicFolding, then create a synthesis report merging both)" style="width:100%;min-height:80px;background:#0a0a0f;border:1px solid #1a1a3e;color:#e0e0e0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;box-sizing:border-box;" oninput="updatePlanButton()"></textarea>
+  <div id="planner-status" style="font-size:10px;color:#8a8a9a;margin-top:4px;"></div>
+</div>
+
+<!-- ── Summary bar ── -->
+<div class="summary-bar">
+  <div class="stat-cell"><div class="val" id="stat-tasks">0</div><div class="lbl">Tasks</div></div>
+  <div class="stat-cell"><div class="val" id="stat-layers">0</div><div class="lbl">Layers</div></div>
+  <div class="stat-cell"><div class="val" id="stat-confirmed">0</div><div class="lbl">Confirmed</div></div>
+  <div class="stat-cell"><div class="val" id="stat-txs">0</div><div class="lbl">Solana Txs</div></div>
+  <div class="stat-cell"><div class="val" id="stat-cost">$0.00</div><div class="lbl">Total Cost</div></div>
+  <div class="stat-cell"><div class="val" id="stat-savings">0</div><div class="lbl">Txs Saved</div></div>
+</div>
+
+<!-- ── Budget + Escrow bar ── -->
+<div id="escrow-bar" style="padding:8px 16px;background:#0d1117;border-bottom:1px solid #1a1a3e;display:flex;align-items:center;gap:16px;">
+  <div style="font-size:10px;color:#8a8a9a;text-transform:uppercase;letter-spacing:1px;">Budget</div>
+  <div style="flex:1;height:12px;background:#1a1a2e;border-radius:6px;overflow:hidden;position:relative;">
+    <div id="budget-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#5cb85c,#f5a623);border-radius:6px;transition:width 0.5s;"></div>
+    <div id="budget-label" style="position:absolute;top:0;left:50%;transform:translateX(-50%);font-size:9px;color:#e0e0e0;line-height:12px;white-space:nowrap;">$0.00 / $5.00</div>
+  </div>
+  <div id="stripe-mode-badge" style="font-size:10px;padding:2px 8px;border-radius:3px;background:#1a1a2e;color:#8a8a9a;">MOCK</div>
+</div>
+
+<!-- ── Three panels ── -->
+<div class="main">
+
+  <!-- ════ Section 1: Agent Prompts ════ -->
+  <div class="panel">
+    <div class="panel-header">
+      <span>Agent Prompts</span>
+      <span class="badge" id="agent-count-badge" style="background:#1a1a2e; color:#5bc0de;">0 / 10</span>
+    </div>
+    <div class="panel-body" id="agent-prompts"></div>
+  </div>
+
+  <!-- ════ Section 2: Task Queue / Batching ════ -->
+  <div class="panel">
+    <div class="panel-header">
+      <span>Task Queue & Batching</span>
+      <span class="badge" id="queue-badge" style="background:#1a1a2e; color:#8a8a9a;">No DAG</span>
+    </div>
+    <div class="panel-body" id="task-queue"></div>
+  </div>
+
+  <!-- ════ Section 3: On-Chain Confirmations ════ -->
+  <div class="panel">
+    <div class="panel-header">
+      <span>On-Chain Confirmations</span>
+      <span class="badge" id="confirm-badge" style="background:#1a1a2e; color:#8a8a9a;">0 txs</span>
+    </div>
+    <div class="panel-body" id="confirmations">
+      <div class="confirmation-empty">No confirmations yet.<br>Submit tasks and start the pipeline.</div>
+    </div>
+  </div>
+
+  <!-- ════ Section 4: Escrow & Agent Wallets ════ -->
+  <div class="panel" id="escrow-panel" style="display:none;">
+    <div class="panel-header">
+      <span>🔒 Escrow & Agent Wallets</span>
+      <span class="badge" id="escrow-mode-badge" style="background:#2a2a1a; color:#f5a623;">ESCROW</span>
+    </div>
+    <div class="panel-body" id="escrow-body">
+      <!-- Escrow balance bar -->
+      <div id="escrow-balance-bar" style="margin-bottom:12px;padding:8px;background:#0d1117;border-radius:6px;border:1px solid #1a1a3e;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-size:10px;color:#8a8a9a;text-transform:uppercase;letter-spacing:1px;">Escrow Balance</span>
+          <span id="escrow-balance-text" style="font-size:13px;font-weight:bold;color:#f5a623;">$5.00</span>
+        </div>
+        <div style="height:8px;background:#1a1a2e;border-radius:4px;overflow:hidden;">
+          <div id="escrow-fill" style="height:100%;width:100%;background:linear-gradient(90deg,#f5a623,#5cb85c);border-radius:4px;transition:width 0.5s;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:#666;margin-top:3px;">
+          <span id="escrow-released-text">Released: $0.00</span>
+          <span id="escrow-held-text">Held: $5.00</span>
+        </div>
+      </div>
+      <!-- Agent wallets table -->
+      <div id="agent-wallets" style="display:grid;gap:4px;"></div>
+      <!-- Solana proofs -->
+      <div id="escrow-proofs" style="margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <!-- ════ Section 5: Speed Benchmark ════ -->
+  <div class="panel" id="benchmark-panel" style="display:none;">
+    <div class="panel-header">
+      <span>⚡ Speed Benchmark</span>
+      <span class="badge" id="bench-badge" style="background:#2a2a1a; color:#f5a623;">CEREBRAS vs GPU</span>
+    </div>
+    <div class="panel-body" id="benchmark-body">
+      <div id="bench-summary" style="margin-bottom:12px;padding:10px;background:#0d1117;border-radius:6px;border:1px solid #1a1a3e;">
+        <div style="font-size:13px;font-weight:bold;color:#f5a623;margin-bottom:6px;">Speed Comparison</div>
+        <div id="bench-total-speedup" style="font-size:24px;font-weight:bold;color:#5cb85c;">--</div>
+        <div style="font-size:10px;color:#8a8a9a;">Cerebras Gemma 4 31B vs GPU GLM-5.2</div>
+      </div>
+      <div id="bench-tasks"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ──
+let ws = null;
+let dagData = null;
+let statusData = null;
+let agentTasks = {};  // agent_id -> {task_id, prompt, status}
+let layerTasks = {};  // layer_idx -> [task_ids]
+let taskMap = {};     // task_id -> task data
+let taskResults = {}; // task_id -> {summary, verified, agent_id, timestamp}
+let attestations = [];
+let agentSpend = {};
+
+const AGENT_IDS = Array.from({length: 10}, (_, i) => `agent-${i+1}`);
+
+// ── Verification type options ──
+const VERIFY_OPTIONS = [
+  ['file_exists', 'File Exists'],
+  ['process_running', 'Process Running'],
+  ['test_passes', 'Test Passes'],
+  ['skill_loads', 'Skill Loads'],
+  ['package_installed', 'Package Installed'],
+  ['command_success', 'Command Success'],
+  ['none', 'No Verify'],
+];
+
+// ── Build agent result display area (Panel 1) ──
+function buildAgentPrompts() {
+  const container = document.getElementById('agent-prompts');
+  container.innerHTML = '<div class="confirmation-empty">Fill in the prompt above and click Plan &amp; Submit.<br>Nemotron will decompose it into tasks with dependencies.</div>';
+}
+
+function updatePlanButton() {
+  const ta = document.getElementById('user-prompt');
+  const btn = document.getElementById('btn-plan');
+  if (ta && btn) {
+    btn.disabled = !ta.value.trim();
+  }
+}
+
+// ── Plan & Submit: call the planner via the bridge ──
+function planAndSubmit() {
+  const prompt = document.getElementById('user-prompt').value.trim();
+  if (!prompt) return;
+
+  const statusDiv = document.getElementById('planner-status');
+  statusDiv.innerHTML = '<span style="color:#f5a623">Planning: calling Nemotron 3 Ultra to decompose prompt...</span>';
+
+  // Send the plan request to the bridge
+  send({type: 'plan_tasks', prompt: prompt});
+}
+
+// ── Collect tasks from prompt fields (legacy, not used with planner) ──
+function collectTasks() {
+  const prompt = document.getElementById('user-prompt').value.trim();
+  if (!prompt) return [];
+  // If we have planned tasks stored, use those
+  if (window.plannedTasks && window.plannedTasks.length > 0) {
+    return window.plannedTasks;
+  }
+  return [];
+}
+
+function submitAllTasks() {
+  planAndSubmit();
+}
+
+function submitSingleTask(agentId) {
+  planAndSubmit();
+}
+
+// ── WebSocket ──
+function connectWS() {
+  const url = document.getElementById('ws-url').value;
+  ws = new WebSocket(url);
+
+  ws.onopen = () => {
+    document.getElementById('btn-connect').textContent = 'Connected';
+    document.getElementById('btn-connect').style.color = '#5cb85c';
+    document.getElementById('btn-plan').disabled = false;
+    send({type: 'get_status'});
+  };
+
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    handleMessage(msg);
+  };
+
+  ws.onclose = () => {
+    document.getElementById('btn-connect').textContent = 'Connect';
+    document.getElementById('btn-connect').style.color = '#5bc0de';
+    document.getElementById('btn-plan').disabled = true;
+    document.getElementById('btn-start').disabled = true;
+  };
+}
+
+function send(msg) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(msg));
+  }
+}
+
+function startPipeline() {
+  send({type: 'start'});
+}
+
+function runBenchmark() {
+  send({type: 'run_benchmark'});
+  const btn = document.getElementById('btn-bench');
+  if (btn) { btn.textContent = 'Running...'; btn.disabled = true; }
+  // Re-enable after 3 min
+  setTimeout(() => { if (btn) { btn.textContent = '⚡ Benchmark'; btn.disabled = false; } }, 180000);
+}
+
+// ── Handle incoming messages ──
+function handleMessage(msg) {
+  if (msg.type === 'planning') {
+    // Planning progress from Nemotron 3 Ultra via NemoClaw
+    const statusDiv = document.getElementById('planner-status');
+    const d = msg.data;
+    if (d.stage === 'starting') {
+      statusDiv.innerHTML = '<span style="color:#5bc0de">⟳ Connecting to Nemotron 3 Ultra via NemoClaw...</span>';
+    } else if (d.stage === 'thinking') {
+      statusDiv.innerHTML = '<span style="color:#f5a623">⟳ ' + escapeHtml(d.message) + '</span>';
+    }
+    // Disable plan button during planning
+    document.getElementById('btn-plan').disabled = true;
+    document.getElementById('btn-plan').textContent = 'Planning...';
+  }
+  else if (msg.type === 'plan_ready') {
+    // Planner decomposed the prompt into tasks
+    const tasks = msg.data.tasks || [];
+    window.plannedTasks = tasks;
+    const statusDiv = document.getElementById('planner-status');
+    statusDiv.innerHTML = `<span style="color:#5cb85c">Planned ${tasks.length} tasks with ${msg.data.total_layers} layers. Click Start Pipeline.</span>`;
+
+    // Render the planned tasks in Panel 1
+    const container = document.getElementById('agent-prompts');
+    container.innerHTML = '';
+    tasks.forEach(task => {
+      const div = document.createElement('div');
+      div.className = 'agent-prompt';
+      div.id = `prompt-${task.agent_id}`;
+      const deps = task.dependencies && task.dependencies.length > 0
+        ? `deps: ${task.dependencies.join(', ')}` : 'no deps';
+      div.innerHTML = `
+        <div class="agent-prompt-header">
+          <span class="agent-label">${task.id} [${task.agent_id}]</span>
+          <span class="agent-status idle" id="status-${task.agent_id}">idle</span>
+        </div>
+        <div style="font-size:11px;color:#e0e0e0;margin-bottom:3px;">${escapeHtml(task.name)}</div>
+        <div style="font-size:9px;color:#8a8a9a;">${escapeHtml(task.description.slice(0, 150))}</div>
+        <div style="font-size:9px;color:#555;margin-top:3px;">${deps}</div>
+        <div class="task-result" id="result-${task.agent_id}" style="display:none;"></div>
+      `;
+      container.appendChild(div);
+    });
+
+    // Also render in the task queue (Panel 2)
+    renderTaskQueue(msg.data);
+    updateSummaryBar(msg.data);
+    document.getElementById('btn-start').disabled = false;
+    // Re-enable plan button
+    document.getElementById('btn-plan').disabled = false;
+    document.getElementById('btn-plan').textContent = 'Plan';
+  }
+  else if (msg.type === 'plan_error') {
+    const statusDiv = document.getElementById('planner-status');
+    statusDiv.innerHTML = `<span style="color:#e74c3c">Planning failed: ${msg.data.error}</span>`;
+  }
+  else if (msg.type === 'dag_ready') {
+    dagData = msg.data;
+    document.getElementById('btn-start').disabled = false;
+    renderTaskQueue(msg.data);
+    updateSummaryBar(msg.data);
+  }
+  else if (msg.type === 'task_progress') {
+    const d = msg.data;
+    updateTaskProgress(d.task_id, d.agent_id, d.stage, d.detail);
+  }
+  else if (msg.type === 'pipeline_started') {
+    // Tasks are being dispatched
+  }
+  else if (msg.type === 'task_dispatched') {
+    updateTaskCard(msg.data.task_id, 'dispatched');
+    updateAgentStatus(msg.data.agent_id, 'busy');
+  }
+  else if (msg.type === 'layer_attesting') {
+    updateLayerStatus(msg.data.layer, 'attesting');
+  }
+  else if (msg.type === 'stripe_charging') {
+    // Stripe escrow charge in progress
+    updateBudgetBar(msg.data);
+    const badge = document.getElementById('stripe-mode-badge');
+    if (badge) {
+      badge.textContent = msg.data.mode ? msg.data.mode.toUpperCase() : 'CHARGING';
+      badge.style.background = '#2a2a1a';
+      badge.style.color = '#f5a623';
+    }
+    // Show escrow panel if in escrow mode
+    if (msg.data.mode === 'escrow') {
+      const panel = document.getElementById('escrow-panel');
+      if (panel) panel.style.display = '';
+      const escBadge = document.getElementById('escrow-mode-badge');
+      if (escBadge) escBadge.textContent = `ESCROW · ${msg.data.agent_count || 0} agents`;
+    }
+  }
+  else if (msg.type === 'pipeline_halted') {
+    // Budget exceeded — pipeline stopped
+    const d = msg.data;
+    const container = document.getElementById('confirmations');
+    if (container.querySelector('.confirmation-empty')) {
+      container.innerHTML = '';
+    }
+    const haltCard = document.createElement('div');
+    haltCard.style.cssText = 'padding:12px;background:#2e1a1a;border-radius:6px;border-left:3px solid #e74c3c;margin-bottom:8px;';
+    haltCard.innerHTML = `
+      <div style="font-size:13px;font-weight:bold;color:#e74c3c;">⚠️ PIPELINE HALTED</div>
+      <div style="font-size:11px;color:#aaa;margin-top:4px;">${escapeHtml(d.message || 'Budget exceeded')}</div>
+      <div style="font-size:10px;color:#666;margin-top:6px;">
+        Layer: ${d.layer} | Spent: $${((d.total_spent_cents||0)/100).toFixed(2)} | Budget: $${((d.budget_cents||0)/100).toFixed(2)}
+      </div>
+      <div style="font-size:9px;color:#555;margin-top:4px;">On-chain proof: ${escapeHtml((d.solana_signature||'').slice(0,40))}...</div>
+    `;
+    container.insertBefore(haltCard, container.firstChild);
+    // Update budget bar to show full
+    const fill = document.getElementById('budget-fill');
+    if (fill) fill.style.width = '100%';
+    const label = document.getElementById('budget-label');
+    if (label) label.textContent = `$${((d.total_spent_cents||0)/100).toFixed(2)} / $${((d.budget_cents||0)/100).toFixed(2)} (HALTED)`;
+  }
+  else if (msg.type === 'layer_attested') {
+    updateLayerStatus(msg.data.layer, 'attested');
+    addConfirmation(msg.data);
+    msg.data.task_ids?.forEach(tid => updateTaskCard(tid, 'confirmed'));
+    updateSpend(msg.data);
+    updateBudgetBar(msg.data);
+  }
+  else if (msg.type === 'escrow_released') {
+    handleEscrowRelease(msg.data);
+  }
+  else if (msg.type === 'pipeline_complete') {
+    updateSummaryBar(msg.data);
+  }
+  else if (msg.type === 'benchmark_results') {
+    handleBenchmarkResults(msg.data);
+  }
+  else if (msg.type === 'status') {
+    statusData = msg.data;
+    if (msg.data.layers) renderTaskQueue(msg.data);
+    if (msg.data.by_status) updateStatusCounts(msg.data);
+    updateSummaryBar(msg.data);
+  }
+  else if (msg.type === 'submission_result') {
+    // Agent submitted task result — store it
+    const data = msg.data || {};
+    const tid = data.task_id || msg.data?.task_id;
+    // The submission_result doesn't include task_id directly, it's in the response
+    // We'll capture it from task_verified instead
+  }
+  else if (msg.type === 'task_verified') {
+    const d = msg.data;
+    if (d.ok) {
+      updateTaskCard(d.task_id, 'verified');
+      if (!taskResults[d.task_id]) taskResults[d.task_id] = {};
+      taskResults[d.task_id].verified = true;
+      taskResults[d.task_id].agent_id = d.agent_id;
+      taskResults[d.task_id].timestamp = new Date().toLocaleTimeString();
+      // Show the actual result summary from the agent
+      const summary = d.summary || '(no output)';
+      taskResults[d.task_id].summary = summary;
+      updateAgentResult(d.agent_id, d.task_id, summary);
+    } else {
+      updateTaskCard(d.task_id, 'failed');
+      updateAgentStatus(d.agent_id, 'failed');
+      if (!taskResults[d.task_id]) taskResults[d.task_id] = {};
+      taskResults[d.task_id].verified = false;
+      taskResults[d.task_id].error = d.error;
+      updateAgentResult(d.agent_id, d.task_id, '[FAILED] ' + (d.error || 'verification failed'));
+    }
+  }
+}
+
+// ── Render task queue (Section 2) ──
+function renderTaskQueue(data) {
+  const container = document.getElementById('task-queue');
+  container.innerHTML = '';
+
+  const layers = data.layers || [];
+  if (layers.length === 0) {
+    container.innerHTML = '<div class="confirmation-empty">No tasks loaded.<br>Fill in agent prompts and click Submit All.</div>';
+    return;
+  }
+
+  document.getElementById('queue-badge').textContent = `${data.total_tasks || 0} tasks / ${data.total_layers || 0} layers`;
+
+  layers.forEach((layer) => {
+    const layerDiv = document.createElement('div');
+    layerDiv.className = 'layer-group';
+    layerDiv.id = `layer-${layer.layer}`;
+
+    const taskIds = layer.task_ids || [];
+    const taskNames = layer.task_names || [];
+    const agents = layer.agents || [];
+
+    layerDiv.innerHTML = `
+      <div class="layer-header">
+        <span>Layer ${layer.layer} (${taskIds.length} tasks)</span>
+        <span class="layer-status pending" id="layer-status-${layer.layer}">pending</span>
+      </div>
+    `;
+
+    taskIds.forEach((tid, i) => {
+      const taskDiv = document.createElement('div');
+      taskDiv.className = 'task-card pending';
+      taskDiv.id = `task-${tid}`;
+      // Find dependencies for this task
+      const plannedTask = window.plannedTasks ? window.plannedTasks.find(t => t.id === tid) : null;
+      const deps = plannedTask && plannedTask.dependencies && plannedTask.dependencies.length > 0
+        ? plannedTask.dependencies.join(', ') : null;
+      const depsHtml = deps
+        ? `<div style="margin-top:3px;font-size:9px;color:#f5a623;">blocked on: ${deps}</div>`
+        : '<div style="margin-top:3px;font-size:9px;color:#5cb85c;">ready (no deps)</div>';
+      taskDiv.innerHTML = `
+        <span class="task-id">${tid}</span>
+        <span class="task-agent">[${agents[i] || '?'}]</span>
+        <span class="task-verify">${layer.verify_methods?.[i] || 'none'}</span>
+        <span class="task-name">${taskNames[i] || ''}</span>
+        ${depsHtml}
+      `;
+      layerDiv.appendChild(taskDiv);
+      taskMap[tid] = {layer: layer.layer, agent: agents[i], name: taskNames[i]};
+    });
+
+    container.appendChild(layerDiv);
+  });
+}
+
+function updateTaskCard(taskId, status) {
+  const card = document.getElementById(`task-${taskId}`);
+  if (card) {
+    card.className = `task-card ${status}`;
+  }
+}
+
+function updateLayerStatus(layerIdx, status) {
+  const badge = document.getElementById(`layer-status-${layerIdx}`);
+  if (badge) {
+    badge.className = `layer-status ${status}`;
+    badge.textContent = status;
+  }
+}
+
+function updateAgentStatus(agentId, status) {
+  const badge = document.getElementById(`status-${agentId}`);
+  const prompt = document.getElementById(`prompt-${agentId}`);
+  if (badge) {
+    badge.className = `agent-status ${status}`;
+    badge.textContent = status;
+  }
+  if (prompt) {
+    prompt.className = `agent-prompt ${status === 'busy' ? 'active' : status === 'done' ? 'submitted' : status === 'failed' ? 'failed' : ''}`;
+  }
+}
+
+function updateTaskProgress(taskId, agentId, stage, detail) {
+  // Update the task card in the queue (Panel 2)
+  const card = document.getElementById(`task-${taskId}`);
+  if (card) {
+    // Set a progress indicator with stage color
+    const stageColors = {
+      'received': '#5bc0de',
+      'calling_model': '#f5a623',
+      'model_calling': '#f5a623',
+      'model_streaming': '#9b59b6',
+      'model_retry': '#e74c3c',
+      'model_done': '#5cb85c',
+      'completed': '#5cb85c',
+    };
+    const color = stageColors[stage] || '#8a8a9a';
+
+    let progressDiv = card.querySelector('.task-progress');
+    if (!progressDiv) {
+      progressDiv = document.createElement('div');
+      progressDiv.className = 'task-progress';
+      progressDiv.style.cssText = 'margin-top:4px;padding:3px 6px;background:#0a0a0f;border-radius:3px;font-size:9px;';
+      card.appendChild(progressDiv);
+    }
+    const time = new Date().toLocaleTimeString();
+
+    // For streaming: show a scrolling trace of the model output
+    if (stage === 'model_streaming') {
+      progressDiv.innerHTML = `<span style="color:${color}">[${time}] streaming</span>: <span style="color:#aaa;font-size:8px;">${escapeHtml(detail.slice(0, 300))}</span>`;
+    } else {
+      progressDiv.innerHTML = `<span style="color:${color}">[${time}] ${stage}</span>: ${escapeHtml(detail.slice(0, 120))}`;
+    }
+  }
+
+  // Update the agent prompt area (Panel 1) — streaming trace
+  const resultDiv = document.getElementById(`result-${agentId}`);
+  if (resultDiv) {
+    resultDiv.style.display = 'block';
+    const stageColors2 = {
+      'received': '#5bc0de',
+      'calling_model': '#f5a623',
+      'model_calling': '#f5a623',
+      'model_streaming': '#9b59b6',
+      'model_retry': '#e74c3c',
+      'model_done': '#5cb85c',
+      'completed': '#5cb85c',
+    };
+    const color = stageColors2[stage] || '#8a8a9a';
+    const time = new Date().toLocaleTimeString();
+
+    if (stage === 'model_streaming') {
+      // Show streaming trace: last N chars of model output, scrollable
+      resultDiv.innerHTML = `<div class="task-result-label" style="color:${color}">[${time}] streaming (live)</div><div style="color:#bbb;font-size:9px;max-height:150px;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word;">${escapeHtml(detail)}</div>`;
+    } else if (stage === 'model_done') {
+      resultDiv.innerHTML = `<div class="task-result-label" style="color:${color}">[${time}] ${stage}</div><div style="color:#aaa">${escapeHtml(detail)}</div>`;
+    } else {
+      resultDiv.innerHTML = `<div class="task-result-label" style="color:${color}">[${time}] ${stage}</div><div style="color:#aaa">${escapeHtml(detail)}</div>`;
+    }
+  }
+
+  // Mark agent as busy when we get first progress
+  if (stage === 'received' || stage === 'calling_model' || stage === 'model_streaming') {
+    updateAgentStatus(agentId, 'busy');
+  }
+}
+
+function updateAgentResult(agentId, taskId, summary) {
+  // Store the result
+  if (!taskResults[taskId]) taskResults[taskId] = {};
+  taskResults[taskId].summary = summary;
+  taskResults[taskId].agent_id = agentId;
+
+  // Update the result div under the agent prompt (Panel 1)
+  const resultDiv = document.getElementById(`result-${agentId}`);
+  if (resultDiv) {
+    resultDiv.style.display = 'block';
+    const fullId = `full-${agentId}`;
+    resultDiv.innerHTML = `<div class="task-result-label">Result (${taskId}):</div><div id="${fullId}" style="max-height:300px;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word;">${escapeHtml(summary)}</div>`;
+  }
+
+  // Also update the task card in the queue (Panel 2)
+  const card = document.getElementById(`task-${taskId}`);
+  if (card) {
+    let resultDiv = card.querySelector('.task-result-inline');
+    if (!resultDiv) {
+      resultDiv = document.createElement('div');
+      resultDiv.className = 'task-result-inline';
+      card.appendChild(resultDiv);
+    }
+    const cardFullId = `card-full-${taskId}`;
+    resultDiv.innerHTML = `<span style="color:#5cb85c">Result:</span> <span id="${cardFullId}" style="display:inline;max-height:80px;overflow:hidden;">${escapeHtml(summary.slice(0, 200))}</span><a href="javascript:void(0)" onclick="toggleExpand('${cardFullId}', '${taskId}')" style="font-size:9px;color:#5bc0de;margin-left:4px;">[expand]</a>`;
+  }
+
+  // Mark agent as done
+  if (taskResults[taskId]?.verified !== false) {
+    updateAgentStatus(agentId, 'done');
+  }
+}
+
+function toggleExpand(spanId, taskId) {
+  const span = document.getElementById(spanId);
+  if (!span) return;
+  const link = span.nextElementSibling;
+  const summary = (taskResults[taskId] && taskResults[taskId].summary) || '';
+  if (span.dataset.expanded === 'true') {
+    span.dataset.expanded = 'false';
+    span.style.maxHeight = '80px';
+    span.style.overflow = 'hidden';
+    span.style.display = 'inline';
+    span.textContent = summary.slice(0, 200);
+    if (link) link.textContent = '[expand]';
+  } else {
+    span.dataset.expanded = 'true';
+    span.style.maxHeight = '400px';
+    span.style.overflowY = 'auto';
+    span.style.display = 'block';
+    span.style.whiteSpace = 'pre-wrap';
+    span.style.wordWrap = 'break-word';
+    span.textContent = summary;
+    if (link) link.textContent = '[collapse]';
+  }
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ── Render confirmations (Section 3) ──
+function addConfirmation(data) {
+  attestations.push(data);
+
+  const container = document.getElementById('confirmations');
+  if (container.querySelector('.confirmation-empty')) {
+    container.innerHTML = '';
+  }
+
+  const card = document.createElement('div');
+  card.className = 'confirmation-card';
+  card.id = `confirmation-${data.layer}`;
+
+  const taskChips = (data.task_ids || []).map(tid =>
+    `<span class="confirmation-task">${tid}</span>`
+  ).join('');
+
+  card.innerHTML = `
+    <div class="confirmation-header">
+      <span class="confirmation-layer">Layer ${data.layer}</span>
+      <span class="confirmation-sig">${(data.signature || '').slice(0, 24)}...</span>
+    </div>
+    <div class="confirmation-details">
+      <span class="label">Tasks:</span> ${data.task_ids?.length || 0}
+      &nbsp; <span class="label">Agents:</span> ${(data.agent_ids || []).join(', ')}
+      &nbsp; <span class="label">Latency:</span> ${data.latency_ms?.toFixed(0) || 0}ms
+      &nbsp; <span class="label">Cost:</span> $${((data.cost_cents || 0)/100).toFixed(2)}
+    </div>
+    ${data.stripe_charge_id ? `
+    <div style="margin-top:4px;font-size:9px;">
+      <span style="color:#5cb85c;">Stripe:</span>
+      <span style="color:#aaa;">${data.stripe_charge_id}</span>
+      &nbsp; <span style="color:#5cb85c;">Remaining:</span>
+      <span style="color:#aaa;">$${((data.remaining_budget_cents||0)/100).toFixed(2)}</span>
+    </div>` : ''}
+    <div class="confirmation-tasks">${taskChips}</div>
+  `;
+
+  container.insertBefore(card, container.firstChild);
+  document.getElementById('confirm-badge').textContent = `${attestations.length} txs`;
+}
+
+// ── Summary bar updates ──
+function updateSummaryBar(data) {
+  document.getElementById('stat-tasks').textContent = data.total_tasks || 0;
+  document.getElementById('stat-layers').textContent = data.total_layers || 0;
+
+  const confirmed = data.by_status?.confirmed?.length || 0;
+  document.getElementById('stat-confirmed').textContent = confirmed;
+
+  document.getElementById('stat-txs').textContent = attestations.length;
+
+  const totalCost = (data.total_cost_cents || 0) / 100;
+  document.getElementById('stat-cost').textContent = `$${totalCost.toFixed(2)}`;
+
+  const totalTasks = data.total_tasks || 0;
+  const txs = attestations.length;
+  const saved = totalTasks - txs;
+  document.getElementById('stat-savings').textContent = saved;
+}
+
+function updateStatusCounts(data) {
+  // Update per-agent status from status data
+  const agents = data.agent_registry?.agents || {};
+  Object.entries(agents).forEach(([aid, info]) => {
+    if (info.status === 'idle' && info.completed_count > 0) {
+      updateAgentStatus(aid, 'done');
+    } else if (info.status === 'busy') {
+      updateAgentStatus(aid, 'busy');
+    }
+  });
+}
+
+function updateSpend(data) {
+  (data.agent_ids || []).forEach(aid => {
+    if (!agentSpend[aid]) agentSpend[aid] = 0;
+    agentSpend[aid] += (data.cost_cents || 0) / Math.max(data.agent_ids.length, 1);
+  });
+}
+
+function updateBudgetBar(data) {
+  const budget = data.budget_cents || 0;
+  const spent = data.total_spent_cents !== undefined ? data.total_spent_cents
+    : (data.remaining_budget_cents !== undefined ? (budget - data.remaining_budget_cents) : 0);
+  const remaining = data.remaining_budget_cents !== undefined ? data.remaining_budget_cents : (budget - spent);
+
+  const pct = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
+  const fill = document.getElementById('budget-fill');
+  if (fill) {
+    fill.style.width = pct + '%';
+    // Red if over 80%
+    if (pct > 80) {
+      fill.style.background = 'linear-gradient(90deg,#f5a623,#e74c3c)';
+    } else if (pct > 50) {
+      fill.style.background = 'linear-gradient(90deg,#5cb85c,#f5a623)';
+    } else {
+      fill.style.background = 'linear-gradient(90deg,#5cb85c,#5cb85c)';
+    }
+  }
+  const label = document.getElementById('budget-label');
+  if (label) {
+    label.textContent = `$${(spent/100).toFixed(2)} / $${(budget/100).toFixed(2)}`;
+  }
+
+  // Update Stripe mode badge
+  const badge = document.getElementById('stripe-mode-badge');
+  if (badge && data.stripe_mode) {
+    badge.textContent = data.stripe_mode.toUpperCase();
+    badge.style.background = data.stripe_mode === 'mock' ? '#1a1a2e' : '#0d1f0d';
+    badge.style.color = data.stripe_mode === 'mock' ? '#8a8a9a' : '#5cb85c';
+  }
+}
+
+// ── Escrow & Agent Wallets ──
+function handleEscrowRelease(data) {
+  // Show the escrow panel
+  const panel = document.getElementById('escrow-panel');
+  if (panel) panel.style.display = '';
+
+  // Update escrow balance bar
+  const esc = data.escrow || {};
+  const released = esc.released_cents || 0;
+  const available = esc.available_cents || 0;
+  const total = released + available;
+  const pct = total > 0 ? (available / total) * 100 : 100;
+
+  const fill = document.getElementById('escrow-fill');
+  if (fill) fill.style.width = pct + '%';
+  const balText = document.getElementById('escrow-balance-text');
+  if (balText) balText.textContent = `$${(available/100).toFixed(2)}`;
+  const relText = document.getElementById('escrow-released-text');
+  if (relText) relText.textContent = `Released: $${(released/100).toFixed(2)}`;
+  const heldText = document.getElementById('escrow-held-text');
+  if (heldText) heldText.textContent = `Held: $${(available/100).toFixed(2)}`;
+
+  // Render agent wallets
+  const walletsRaw = data.wallets || [];
+  const walletDiv = document.getElementById('agent-wallets');
+  if (walletDiv) {
+    // wallets can be a list of summary dicts or a dict keyed by agent_id
+    const walletList = Array.isArray(walletsRaw) ? walletsRaw : Object.values(walletsRaw);
+    walletDiv.innerHTML = walletList
+      .filter(w => w.exists !== false)
+      .sort((a, b) => (a.agent_id || '').localeCompare(b.agent_id || ''))
+      .map(w => {
+        const bal = (w.balance_cents || 0) / 100;
+        const tasks = w.total_tasks || w.task_count || 0;
+        const success = w.success_rate || '—';
+        const status = w.status || 'active';
+        const statusColor = status === 'promoted' ? '#5cb85c' : status === 'halted' ? '#e74c3c' : '#5bc0de';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#0d1117;border-radius:4px;border:1px solid #1a1a3e;">
+          <span style="font-size:11px;font-weight:bold;color:#5bc0de;min-width:60px;">${escapeHtml(w.agent_id || 'unknown')}</span>
+          <span style="font-size:13px;font-weight:bold;color:#f5a623;min-width:60px;">$${bal.toFixed(2)}</span>
+          <span style="font-size:10px;color:#666;flex:1;">${tasks} tasks · ${escapeHtml(String(success))} success</span>
+          <span style="font-size:9px;padding:2px 6px;border-radius:3px;background:#1a1a2e;color:${statusColor};">${status}</span>
+        </div>`;
+      }).join('');
+  }
+
+  // Render Solana proof for this release
+  const releases = data.releases || [];
+  const proofsDiv = document.getElementById('escrow-proofs');
+  if (proofsDiv && releases.length > 0) {
+    const layer = data.layer;
+    const proofHtml = releases.map(r => {
+      const ok = r.ok;
+      const color = ok ? '#5cb85c' : '#e74c3c';
+      const icon = ok ? '✅' : '❌';
+      return `<div style="font-size:10px;color:#888;padding:3px 0;border-bottom:1px solid #0d1117;">
+        ${icon} <span style="color:#5bc0de;">${escapeHtml(r.agent_id)}</span>
+        → <span style="color:${color};font-weight:bold;">$${((r.amount_cents||0)/100).toFixed(2)}</span>
+        <span style="color:#555;font-size:9px;">${escapeHtml((r.transfer_id||'').slice(0,20))}</span>
+      </div>`;
+    }).join('');
+    const existing = proofsDiv.innerHTML;
+    proofsDiv.innerHTML = `<div style="font-size:9px;color:#555;margin-bottom:3px;">Layer ${layer} releases:</div>` + proofHtml + existing;
+  }
+}
+
+// ── Speed Benchmark ──
+function handleBenchmarkResults(data) {
+  const panel = document.getElementById('benchmark-panel');
+  if (panel) panel.style.display = '';
+
+  const cerebras = data.cerebras || {};
+  const glm = data.glm || {};
+  const speedup = data.total_speedup || 0;
+
+  // Total speedup
+  const speedupDiv = document.getElementById('bench-total-speedup');
+  if (speedupDiv) {
+    speedupDiv.textContent = `${speedup.toFixed(1)}x faster`;
+    speedupDiv.style.color = speedup > 10 ? '#5cb85c' : speedup > 3 ? '#f5a623' : '#e74c3c';
+  }
+
+  // Per-task comparison
+  const cTasks = cerebras.tasks || [];
+  const gTasks = glm.tasks || [];
+  const tasksDiv = document.getElementById('bench-tasks');
+  if (tasksDiv) {
+    let html = `<div style="display:grid;grid-template-columns:1fr 80px 80px 60px;gap:4px;font-size:9px;color:#8a8a9a;text-transform:uppercase;letter-spacing:1px;padding:4px 0;border-bottom:1px solid #1a1a3e;">
+      <span>Task</span><span style="text-align:right;">Cerebras</span><span style="text-align:right;">GPU GLM</span><span style="text-align:right;">Speedup</span>
+    </div>`;
+
+    cTasks.forEach((ct, i) => {
+      const gt = gTasks[i] || {};
+      const cMs = ct.latency_ms || 0;
+      const gMs = gt.latency_ms || 0;
+      const tSpeedup = gMs > 0 && cMs > 0 ? gMs / cMs : 0;
+      const cColor = '#5cb85c';
+      const gColor = '#e74c3c';
+      const sColor = tSpeedup > 10 ? '#5cb85c' : tSpeedup > 3 ? '#f5a623' : '#e74c3c';
+      html += `<div style="display:grid;grid-template-columns:1fr 80px 80px 60px;gap:4px;padding:6px 4px;border-bottom:1px solid #0d1117;align-items:center;">
+        <span style="font-size:10px;color:#e0e0e0;">${escapeHtml(ct.task_name || ct.task_id || '?')}</span>
+        <span style="text-align:right;font-size:11px;font-weight:bold;color:${cColor};">${(cMs/1000).toFixed(1)}s</span>
+        <span style="text-align:right;font-size:11px;color:${gColor};">${(gMs/1000).toFixed(1)}s</span>
+        <span style="text-align:right;font-size:11px;font-weight:bold;color:${sColor};">${tSpeedup.toFixed(1)}x</span>
+      </div>`;
+    });
+
+    // Totals row
+    html += `<div style="display:grid;grid-template-columns:1fr 80px 80px 60px;gap:4px;padding:8px 4px;margin-top:4px;background:#0d1117;border-radius:4px;align-items:center;">
+      <span style="font-size:10px;font-weight:bold;color:#f5a623;">TOTAL</span>
+      <span style="text-align:right;font-size:12px;font-weight:bold;color:#5cb85c;">${(cerebras.total_time_s||0).toFixed(1)}s</span>
+      <span style="text-align:right;font-size:12px;font-weight:bold;color:#e74c3c;">${(glm.total_time_s||0).toFixed(1)}s</span>
+      <span style="text-align:right;font-size:12px;font-weight:bold;color:#5cb85c;">${speedup.toFixed(1)}x</span>
+    </div>`;
+
+    tasksDiv.innerHTML = html;
+  }
+}
+
+// ── Init ──
+buildAgentPrompts();
+</script>
+</body>
+</html>
