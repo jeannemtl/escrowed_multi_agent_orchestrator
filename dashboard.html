@@ -290,6 +290,7 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Monaco', mo
     <button id="btn-start" class="btn-action" onclick="startPipeline()" disabled>Start Pipeline</button>
     <button id="btn-bench" class="btn-small" onclick="runBenchmark()">⚡ Benchmark</button>
     <button id="btn-race" class="btn-small" onclick="startRace()" style="background:#2a2a1a;color:#f5a623;font-weight:bold;">🏁 Race</button>
+    <span id="speedup-badge" style="display:none;font-size:13px;font-weight:bold;color:#5cb85c;background:#0d1f0d;padding:4px 10px;border-radius:4px;border:1px solid #2d6a2d;">⚡ 37.1x faster</span>
   </div>
 </div>
 
@@ -1485,6 +1486,24 @@ function handleComparisonComplete(data) {
   // Re-enable race button
   const btn = document.getElementById('btn-race');
   if (btn) { btn.textContent = '🏁 Race'; btn.disabled = false; }
+
+  // Update header speedup badge
+  const badge = document.getElementById('speedup-badge');
+  if (badge) {
+    badge.style.display = '';
+    const speedupVal = speedup.toFixed(1);
+    if (speedup > 1) {
+      badge.textContent = `⚡ Cerebras ${speedupVal}x faster`;
+      badge.style.color = '#5cb85c';
+      badge.style.background = '#0d1f0d';
+      badge.style.borderColor = '#2d6a2d';
+    } else {
+      badge.textContent = `⚡ GPU ${(1/speedup).toFixed(1)}x faster`;
+      badge.style.color = '#e74c3c';
+      badge.style.background = '#1f0d0d';
+      badge.style.borderColor = '#8b0000';
+    }
+  }
 }
 
 function handleComparisonLayer(data) {
