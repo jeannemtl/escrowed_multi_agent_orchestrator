@@ -1017,7 +1017,7 @@ async def main():
 
                 elif msg_type == "run_comparison":
                     # Live side-by-side race: Cerebras vs GPU, simultaneously
-                    prompt = msg.get("prompt", "")
+                    prompt = req.get("prompt", "")
                     log.info("Starting live comparison race...")
                     asyncio.create_task(bridge.run_comparison_race(prompt, websocket))
 
