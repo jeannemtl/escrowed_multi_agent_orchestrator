@@ -625,8 +625,12 @@ class MultiAgentBridge:
                 dead.add(ws)
         self.clients -= dead
 
-    async def run_comparison_race(self, prompt: str, ws):
-        """Run Cerebras and GPU GLM simultaneously, with layers, attestation, escrow."""
+    async def run_comparison_race(self, prompt: str, ws, image_b64: str = ""):
+        """Run Cerebras and GPU GLM simultaneously, with layers, attestation, escrow.
+
+        If image_b64 is provided, uses vision model + planner to decompose the image
+        into image-specific subtasks instead of the generic hardcoded templates.
+        """
         from agent_client import load_api_keys, call_glm, call_gemma4, MODEL_CONFIG
         import hashlib
         import time as _time
@@ -636,8 +640,25 @@ class MultiAgentBridge:
             await self._send_to(ws, {"type": "comparison_error", "data": {"error": "Missing API keys for one or both providers"}})
             return
 
-        # Build layered task structure
-        layers = self._get_comparison_layers(prompt)
+        # Build layered task structure — from image (planner) or from prompt (templates)
+        if image_b64:
+            log.info("Race: decomposing image with vision model + planner...")
+            await self._broadcast({"type": "comparison_planning", "data": {
+                "stage": "analyzing_image",
+                "message": "Analyzing image with vision model, then decomposing into race tasks...",
+            }})
+            try:
+                from planner import plan_from_image
+                planned = await plan_from_image(image_b64, user_prompt=prompt)
+                layers = self._planner_tasks_to_layers(planned) if planned else None
+                if not layers:
+                    log.warning("Image planning returned no tasks, falling back to prompt templates")
+                    layers = self._get_comparison_layers(prompt)
+            except Exception as e:
+                log.error(f"Image planning failed: {e}, falling back to prompt templates")
+                layers = self._get_comparison_layers(prompt)
+        else:
+            layers = self._get_comparison_layers(prompt)
 
         # Announce the race with full layer structure
         await self._broadcast({
@@ -816,6 +837,19 @@ class MultiAgentBridge:
                 })
 
             total = _time.time() - start
+
+            # Broadcast per-side completion immediately
+            await self._broadcast({
+                "type": "comparison_side_done",
+                "data": {
+                    "side": label,
+                    "total_time_s": total,
+                    "successful": sum(1 for r in all_results if r.get("ok")),
+                    "total_tasks": len(all_results),
+                    "model": config["model"],
+                }
+            })
+
             return {
                 "provider": provider,
                 "model": config["model"],
@@ -854,6 +888,51 @@ class MultiAgentBridge:
             }
         })
         log.info(f"Comparison race done: Cerebras {c_result['total_time_s']:.1f}s vs GPU {g_result['total_time_s']:.1f}s = {speedup:.1f}x")
+
+    def _planner_tasks_to_layers(self, planned_tasks: list[dict]) -> list:
+        """Convert planner output (flat task list with dependencies) into race layers.
+
+        Planner returns: [{"id":"task_00","name":"...","description":"...","dependencies":[]}]
+        Race needs:     [{"layer":0,"name":"...","tasks":[{"id":"...","name":"...","prompt":"..."}]}]
+        """
+        from task_dag import build_dag, compute_layers
+
+        if not planned_tasks:
+            return []
+
+        # Ensure each task has a description (used as the prompt for the race agent)
+        for t in planned_tasks:
+            if "description" not in t or not t["description"]:
+                t["description"] = t.get("name", "Research task")
+
+        # Use the DAG builder to compute dependency-based layers
+        tasks_dict, layer_ids = build_dag(planned_tasks)
+
+        # Layer name heuristics
+        layer_names = [
+            "Parallel Research",
+            "Synthesis & Analysis",
+            "Refinement & Reporting",
+            "Final Review",
+        ]
+
+        race_layers = []
+        for i, task_ids in enumerate(layer_ids):
+            name = layer_names[i] if i < len(layer_names) else f"Layer {i}"
+            race_tasks = []
+            for tid in task_ids:
+                t = tasks_dict[tid]
+                race_tasks.append({
+                    "id": t.id,
+                    "name": t.name,
+                    "prompt": t.description,
+                })
+            race_layers.append({
+                "layer": i,
+                "name": name,
+                "tasks": race_tasks,
+            })
+        return race_layers
 
     def _get_comparison_layers(self, prompt: str) -> list:
         """Decompose prompt into layered DAG structure for the race."""
@@ -1014,7 +1093,7 @@ async def main():
                         progress_task = asyncio.create_task(planning_progress())
 
                         if image_b64:
-                            tasks = await plan_from_image(image_b64)
+                            tasks = await plan_from_image(image_b64, user_prompt=user_prompt)
                         else:
                             tasks = await plan_tasks(user_prompt)
                         progress_task.cancel()
@@ -1150,8 +1229,9 @@ async def main():
                 elif msg_type == "run_comparison":
                     # Live side-by-side race: Cerebras vs GPU, simultaneously
                     prompt = req.get("prompt", "")
+                    image_b64 = req.get("image", "")
                     log.info("Starting live comparison race...")
-                    asyncio.create_task(bridge.run_comparison_race(prompt, websocket))
+                    asyncio.create_task(bridge.run_comparison_race(prompt, websocket, image_b64=image_b64))
 
                 elif msg_type == "ping":
                     await bridge._send_to(websocket, { "type": "pong" })

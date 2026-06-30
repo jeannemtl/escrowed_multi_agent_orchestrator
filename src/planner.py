@@ -112,53 +112,74 @@ You MUST respond with ONLY a JSON array. No markdown, no explanation, no code fe
 CRITICAL: Return ONLY the JSON array."""
 
 
-async def plan_from_image(image_b64: str, use_nemotron: bool = True) -> list[dict]:
+async def plan_from_image(image_b64: str, user_prompt: str = "", use_nemotron: bool = True) -> list[dict]:
     """
     Analyze an uploaded image with a vision model, then decompose into subtasks.
-    Step 1: Vision model describes what's in the image.
-    Step 2: That description is passed to the normal planner.
+    Step 1: Vision model describes what's in the image (with user's prompt as context).
+    Step 2: The image description + user's prompt are passed to the planner together.
     """
     api_keys = load_api_keys()
 
-    # Step 1: Describe the image using a vision-capable model via OpenRouter
-    log.info("Planning from image: calling vision model to analyze...")
-    description = await _describe_image(image_b64, api_keys.get("glm", ""))
+    # Step 1: Describe the image using Cerebras gemma-4-31b (vision-capable)
+    log.info(f"Planning from image (prompt: {len(user_prompt)} chars): calling Cerebras gemma-4-31b vision model...")
+    description = await _describe_image(image_b64, api_keys.get("gemma4", ""), user_prompt)
     if not description:
         log.warning("Vision model failed, cannot plan from image")
         return []
 
     log.info(f"Vision model described image ({len(description)} chars), decomposing...")
 
-    # Step 2: Pass the description through the normal planner
-    return await plan_tasks(description, use_nemotron=use_nemotron)
+    # Step 2: Combine image description with user's prompt for the planner
+    if user_prompt.strip():
+        combined = f"User request: {user_prompt.strip()}\n\nImage analysis:\n{description}"
+    else:
+        combined = description
+
+    return await plan_tasks(combined, use_nemotron=use_nemotron)
 
 
-async def _describe_image(image_b64: str, api_key: str) -> str:
+async def _describe_image(image_b64: str, api_key: str, user_prompt: str = "") -> str:
     """
     Call a vision-capable model to describe an image.
-    Uses GLM-5.2 via OpenRouter (supports image_url in messages).
+    Uses Cerebras gemma-4-31b (supports image_url in messages).
+    If user_prompt is provided, the vision model uses it as context for what to focus on.
     Returns a text description of the image.
     """
     if not api_key:
-        log.error("No OpenRouter API key for vision model")
+        log.error("No Cerebras API key for vision model")
         return ""
 
-    url = "https://openrouter.ai/api/v1/chat/completions"
+    url = "https://api.cerebras.ai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
+    if user_prompt.strip():
+        vision_text = (
+            "You analyze images and describe them in detail for a multi-agent research system. "
+            "Describe: what is shown, any text visible, technical details, data presented, and key topics that could be researched. "
+            "Be thorough and specific. This description will be used to decompose into research tasks.\n\n"
+            f"The user has provided this request alongside the image: \"{user_prompt.strip()}\"\n"
+            "Analyze the image with this request in mind. Focus on aspects of the image relevant to what the user wants. "
+            "Also describe anything else important in the image.\n\n"
+            "Describe everything relevant for research task decomposition. What is it? What topics does it cover? What could agents research about it?"
+        )
+    else:
+        vision_text = (
+            "You analyze images and describe them in detail for a multi-agent research system. "
+            "Describe: what is shown, any text visible, technical details, data presented, and key topics that could be researched. "
+            "Be thorough and specific. This description will be used to decompose into research tasks.\n\n"
+            "Analyze this image and describe everything relevant for research task decomposition. "
+            "What is it? What topics does it cover? What could agents research about it?"
+        )
+
     payload = {
-        "model": "z-ai/glm-5.2",
+        "model": "gemma-4-31b",
         "messages": [
-            {
-                "role": "system",
-                "content": "You analyze images and describe them in detail for a multi-agent research system. Describe: what is shown, any text visible, technical details, data presented, and key topics that could be researched. Be thorough and specific. This description will be used to decompose into research tasks.",
-            },
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Analyze this image and describe everything relevant for research task decomposition. What is it? What topics does it cover? What could agents research about it?"},
+                    {"type": "text", "text": vision_text},
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}},
                 ],
             },

@@ -3,315 +3,648 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Multi-Agent Orchestrator</title>
+<title>Cerebrain — Multi-Agent Orchestrator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Mulish:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Monaco', monospace; font-size: 13px; }
+html, body { height: 100%; }
+body {
+  background: linear-gradient(180deg, #16a298 0%, #23a3a3 45%, #39b8b0 100%);
+  color: #1f2d2c;
+  font-family: 'Mulish', system-ui, sans-serif;
+  font-size: 14px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Shared card style ── */
+.card {
+  background: #ffffff;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 60, 55, 0.12);
+}
 
 /* ── Header ── */
-.header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;
-  background: linear-gradient(135deg, #1a1a2e, #16213e); border-bottom: 1px solid #0f3460; }
-.header h1 { font-size: 16px; color: #e94560; }
-.header .controls { display: flex; gap: 8px; align-items: center; }
-.header input { padding: 5px 8px; background: #1a1a2e; border: 1px solid #333; color: #e0e0e0;
-  border-radius: 4px; font-family: inherit; font-size: 11px; width: 200px; }
-.header button { padding: 5px 14px; border: none; border-radius: 4px; cursor: pointer;
-  font-family: inherit; font-size: 11px; font-weight: bold; }
-.btn-connect { background: #0f3460; color: #5bc0de; }
-.btn-connect:hover { background: #1a4a7a; }
-.btn-action { background: #e94560; color: white; }
-.btn-action:hover { background: #c73e54; }
-.btn-action:disabled { background: #333; color: #666; cursor: not-allowed; }
-.btn-small { padding: 3px 10px; font-size: 10px; background: #0f3460; color: #5bc0de;
-  border: none; border-radius: 3px; cursor: pointer; }
-.btn-small:hover { background: #1a4a7a; }
-
-/* ── Summary bar ── */
-.summary-bar { display: flex; gap: 0; padding: 0; background: #0d1117; border-bottom: 1px solid #1a1a3e; }
-.stat-cell { flex: 1; padding: 8px 12px; text-align: center; border-right: 1px solid #1a1a3e; }
-.stat-cell:last-child { border-right: none; }
-.stat-cell .val { font-size: 18px; font-weight: bold; color: #e94560; }
-.stat-cell .lbl { font-size: 9px; color: #8a8a9a; text-transform: uppercase; margin-top: 2px; }
-
-/* ── Three-panel layout ── */
-.main { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; height: calc(100vh - 140px); overflow: hidden; }
-.panel { background: #0d1117; border-right: 1px solid #1a1a3e; display: flex; flex-direction: column; overflow: hidden; }
-.panel:last-child { border-right: none; }
-.panel-header { padding: 8px 12px; background: #111827; border-bottom: 1px solid #1a1a3e;
-  font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #8a8a9a;
-  display: flex; justify-content: space-between; align-items: center; }
-.panel-header .badge { padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: normal; }
-.panel-body { flex: 1; overflow-y: auto; padding: 8px; }
-
-/* ── Section 1: Agent Prompts ── */
-.agent-prompt { margin-bottom: 8px; padding: 8px; background: #111827; border-radius: 6px;
-  border: 1px solid #1a1a3e; transition: border-color 0.3s; }
-.agent-prompt.active { border-color: #0f3460; }
-.agent-prompt.submitted { border-color: #2d6a2d; }
-.agent-prompt.failed { border-color: #8b0000; }
-.agent-prompt-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-.agent-label { font-size: 11px; font-weight: bold; color: #5bc0de; }
-.agent-status { font-size: 9px; padding: 2px 6px; border-radius: 3px; }
-.agent-status.idle { background: #1a1a2e; color: #666; }
-.agent-status.busy { background: #1a2332; color: #5bc0de; }
-.agent-status.done { background: #0d1f0d; color: #5cb85c; }
-.agent-status.failed { background: #2e1a1a; color: #e74c3c; }
-.agent-prompt textarea { width: 100%; background: #0a0a0f; border: 1px solid #1a1a3e; color: #e0e0e0;
-  border-radius: 4px; padding: 6px 8px; font-family: inherit; font-size: 11px; resize: vertical;
-  min-height: 36px; }
-.agent-prompt textarea:focus { outline: none; border-color: #0f3460; }
-.agent-prompt-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
-.agent-prompt .verify-info { font-size: 9px; color: #555; }
-
-/* ── Section 2: Task Queue / Batching ── */
-.layer-group { margin-bottom: 12px; }
-.layer-header { font-size: 11px; color: #8a8a9a; margin-bottom: 4px; display: flex;
-  justify-content: space-between; align-items: center; }
-.layer-header .layer-status { font-size: 9px; padding: 2px 6px; border-radius: 3px; }
-.layer-status.pending { background: #1a1a2e; color: #666; }
-.layer-status.collecting { background: #1a2332; color: #5bc0de; }
-.layer-status.verifying { background: #2a1a2e; color: #c77dff; }
-.layer-status.ready { background: #1a2e1a; color: #5cb85c; }
-.layer-status.attesting { background: #2a2a1a; color: #f5a623; }
-.layer-status.attested { background: #0d1f0d; color: #5cb85c; }
-.layer-status.failed { background: #2e1a1a; color: #e74c3c; }
-.task-card { padding: 6px 8px; margin-bottom: 4px; background: #111827; border-radius: 4px;
-  border-left: 3px solid #333; font-size: 11px; transition: all 0.3s; }
-.task-card.pending { border-left-color: #333; }
-.task-card.dispatched { border-left-color: #0f3460; background: #0d1520; }
-.task-card.submitted { border-left-color: #533483; background: #150d20; }
-.task-card.verified { border-left-color: #2d6a2d; background: #0d150d; }
-.task-card.confirmed { border-left-color: #5cb85c; background: #0a120a; }
-.task-card.failed { border-left-color: #8b0000; background: #150808; }
-.task-card .task-id { font-weight: bold; color: #e0e0e0; }
-.task-card .task-agent { color: #5bc0de; font-size: 10px; }
-.task-card .task-verify { color: #666; font-size: 9px; }
-.task-card .task-time { color: #555; font-size: 9px; float: right; }
-.batch-summary { padding: 6px 8px; margin-top: 4px; background: #0a1a0a; border-radius: 4px;
-  border: 1px solid #2d6a2d; font-size: 10px; color: #5cb85c; }
-
-/* ── Section 3: Confirmations ── */
-.confirmation-card { padding: 10px; margin-bottom: 8px; background: #111827; border-radius: 6px;
-  border-left: 3px solid #5cb85c; }
-.confirmation-card.pending { border-left-color: #f5a623; opacity: 0.7; }
-.confirmation-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
-.confirmation-layer { font-size: 12px; font-weight: bold; color: #5cb85c; }
-.confirmation-sig { font-size: 10px; color: #8a8a9a; }
-.confirmation-details { font-size: 10px; color: #aaa; line-height: 1.5; }
-.confirmation-details .label { color: #666; }
-.confirmation-tasks { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
-.confirmation-task { padding: 1px 6px; background: #0a1a0a; border-radius: 3px; font-size: 9px; color: #5cb85c; }
-.confirmation-empty { text-align: center; padding: 40px 20px; color: #333; font-size: 12px; }
-.cost-display { font-size: 16px; color: #e94560; font-weight: bold; }
-.savings-badge { display: inline-block; padding: 2px 8px; background: #0d1f0d; border-radius: 3px;
-  font-size: 10px; color: #5cb85c; margin-top: 4px; }
-
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0a0a0f; }
-::-webkit-scrollbar-thumb { background: #1a1a3e; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #2a2a4e; }
-
-/* ── Task Results ── */
-.task-result { margin-top: 6px; padding: 6px; background: #0a0a0f; border-radius: 4px;
-  border: 1px solid #1a1a3e; font-size: 10px; color: #aaa; max-height: 120px; overflow-y: auto;
-  white-space: pre-wrap; word-wrap: break-word; }
-.task-result-label { font-size: 9px; color: #5cb85c; font-weight: bold; margin-bottom: 2px; }
-.task-card .task-result-inline { margin-top: 4px; padding: 4px 6px; background: #0a0a0f; border-radius: 3px;
-  font-size: 9px; color: #aaa; max-height: 80px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;
-  border-top: 1px solid #1a1a3e; }
-.task-result-empty { color: #555; font-style: italic; }
-
-/* ── Race Mode Split Panel ── */
-.race-overlay {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  background: #0a0a0f; z-index: 9999; display: none;
-  flex-direction: column; overflow: hidden;
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 36px 14px 36px;
 }
-.race-overlay.active { display: flex; }
-.race-header {
+.app-header .brand {
+  font-family: 'Jost', sans-serif;
+  font-weight: 700;
+  font-size: 36px;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.app-header .brand .logo-mark {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: #ffffff;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Jost', sans-serif; font-weight: 700; font-size: 22px;
+  color: #1fa89d;
+}
+.app-header .header-right {
+  display: flex; align-items: center; gap: 22px;
+}
+.conn-status {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Mulish', sans-serif; font-size: 13px; font-weight: 600; color: #ffffff;
+}
+.conn-dot {
+  width: 9px; height: 9px; border-radius: 50%; background: #6ee7d7;
+  box-shadow: 0 0 0 0 rgba(110, 231, 215, 0.7);
+  animation: pulse 2s infinite;
+}
+.conn-dot.offline { background: #e0c8c0; animation: none; box-shadow: none; }
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(110, 231, 215, 0.7); }
+  70% { box-shadow: 0 0 0 8px rgba(110, 231, 215, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(110, 231, 215, 0); }
+}
+.nav-items {
+  display: flex; align-items: center; gap: 4px;
+  font-family: 'Mulish', sans-serif; font-size: 14px; font-weight: 600;
+}
+.nav-items .nav-item {
+  padding: 6px 14px; cursor: pointer; color: #ffffff; border-radius: 4px;
+  transition: background 0.15s; user-select: none;
+  background: transparent; border: none; font-family: inherit; font-size: inherit; font-weight: inherit;
+}
+.nav-items .nav-item:hover { background: rgba(255,255,255,0.15); }
+.nav-items .nav-sep { color: rgba(255,255,255,0.4); padding: 0 2px; }
+.nav-items .nav-item.race { color: #fff; }
+.speedup-badge {
+  display: none;
+  font-family: 'Jost', sans-serif; font-size: 13px; font-weight: 600;
+  color: #0d6e66; background: #d4f5ef;
+  padding: 5px 12px; border-radius: 20px; border: 1px solid #8fd8cd;
+  white-space: nowrap;
+}
+
+/* ── Search / prompt bar ── */
+.search-section {
+  padding: 0 36px 8px 36px;
+}
+.search-bar {
+  display: flex; align-items: center; gap: 0;
+  background: #ffffff; border-radius: 30px;
+  padding: 6px 6px 6px 18px;
+  box-shadow: 0 4px 14px rgba(0,60,55,0.14);
+}
+.search-bar .prompt-input {
+  flex: 1; border: none; outline: none; background: transparent;
+  font-family: 'Mulish', sans-serif; font-size: 15px; color: #1f2d2c;
+  padding: 10px 8px; resize: none; min-height: 24px; line-height: 1.4;
+}
+.search-bar .prompt-input::placeholder { color: #9bb5b1; }
+.search-bar .image-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #eaf7f4; color: #1fa89d; border: none; cursor: pointer;
+  font-family: 'Mulish', sans-serif; font-size: 13px; font-weight: 600;
+  padding: 8px 16px; border-radius: 20px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.search-bar .image-btn:hover { background: #d4f0ea; }
+.search-bar .plan-btn {
+  background: #1fa89d; color: #ffffff; border: none; cursor: pointer;
+  font-family: 'Mulish', sans-serif; font-size: 14px; font-weight: 700;
+  padding: 10px 22px; border-radius: 20px; white-space: nowrap; margin-left: 8px;
+  transition: background 0.15s;
+}
+.search-bar .plan-btn:hover { background: #178f86; }
+.search-bar .plan-btn:disabled { background: #c0d8d4; color: #7fa9a3; cursor: not-allowed; }
+
+.image-preview-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  margin-left: 6px;
+}
+#image-preview { display: none; max-width: 64px; max-height: 64px; border-radius: 6px; border: 1px solid #c0d8d4; }
+#image-clear { display: none; font-size: 10px; background: #fdecea; color: #d94f4f; border: none; border-radius: 10px; padding: 2px 9px; cursor: pointer; font-family: 'Mulish', sans-serif; }
+.planner-status {
+  font-size: 12px; color: rgba(255,255,255,0.85); padding: 6px 18px 0 18px;
+  font-family: 'Mulish', sans-serif; font-weight: 500; min-height: 18px;
+}
+
+/* ── Prompt history timeline ── */
+.prompt-history {
+  display: flex; align-items: center; gap: 0;
+  padding: 10px 36px 6px 36px;
+  overflow-x: auto;
+}
+.prompt-history .hist-label {
+  font-family: 'Jost', sans-serif; font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.6);
+  margin-right: 12px; white-space: nowrap;
+}
+.prompt-history .hist-item {
+  padding: 5px 14px; font-size: 12px; color: rgba(255,255,255,0.85);
+  font-family: 'Mulish', sans-serif; white-space: nowrap; cursor: pointer;
+  border-right: 1px solid rgba(255,255,255,0.2); transition: background 0.15s;
+}
+.prompt-history .hist-item:last-child { border-right: none; }
+.prompt-history .hist-item .hist-date { display: block; font-size: 10px; color: rgba(255,255,255,0.5); font-weight: 500; }
+.prompt-history .hist-item:hover { background: rgba(255,255,255,0.1); }
+.prompt-history .hist-item.active { background: rgba(255,255,255,0.18); border-radius: 4px; color: #fff; font-weight: 600; }
+
+/* ── Summary + Budget bar ── */
+.summary-strip {
+  display: flex; align-items: center; gap: 0;
+  margin: 0 36px 10px 36px;
+  padding: 0 0 10px 0;
+}
+.summary-strip .stat-cell {
+  flex: 1; padding: 8px 14px; text-align: center;
+  border-right: 1px solid rgba(255,255,255,0.18);
+}
+.summary-strip .stat-cell:last-child { border-right: none; }
+.summary-strip .stat-cell .val {
+  font-family: 'Jost', sans-serif; font-size: 22px; font-weight: 700; color: #ffffff;
+}
+.summary-strip .stat-cell .lbl {
+  font-size: 10px; color: rgba(255,255,255,0.7); text-transform: uppercase;
+  letter-spacing: 1px; margin-top: 2px; font-weight: 600;
+}
+
+.budget-strip {
+  display: flex; align-items: center; gap: 14px;
+  margin: 0 36px 16px 36px;
+  padding: 8px 16px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 4px;
+}
+.budget-strip .budget-label {
+  font-family: 'Jost', sans-serif; font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1px; color: #ffffff; white-space: nowrap;
+}
+.budget-strip .budget-track {
+  flex: 1; height: 10px; background: rgba(255,255,255,0.22); border-radius: 6px; overflow: hidden; position: relative;
+}
+.budget-strip #budget-fill {
+  height: 100%; width: 0%; border-radius: 6px; transition: width 0.5s;
+  background: linear-gradient(90deg, #a8e6dc, #ffe5a0);
+}
+.budget-strip #budget-label {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  font-size: 9px; color: #fff; line-height: 10px; font-weight: 600; white-space: nowrap;
+}
+.budget-strip #stripe-mode-badge {
+  font-size: 10px; padding: 3px 10px; border-radius: 10px;
+  background: rgba(255,255,255,0.2); color: #fff; font-weight: 600; font-family: 'Mulish', sans-serif;
+}
+
+/* ── Three-panel grid ── */
+.main-grid {
+  display: grid;
+  grid-template-columns: 312px 1fr 330px;
+  gap: 14px;
+  padding: 0 36px;
+  flex: 1;
+  min-height: 0;
+}
+.panel-card {
+  background: #ffffff;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0,60,55,0.14);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+.panel-card .panel-header {
+  padding: 16px 18px 12px 18px;
+  border-bottom: 1px solid #eaf2f0;
   display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 20px; background: linear-gradient(135deg, #1a1a2e, #16213e);
-  border-bottom: 1px solid #0f3460;
+  font-family: 'Jost', sans-serif; font-size: 16px; font-weight: 600; color: #1f2d2c;
 }
-.race-header h1 { font-size: 16px; color: #e94560; }
-.race-close {
-  background: #8b0000; color: white; border: none; border-radius: 4px;
-  padding: 5px 14px; cursor: pointer; font-family: inherit; font-size: 11px; font-weight: bold;
+.panel-card .panel-header .badge {
+  font-family: 'Mulish', sans-serif; font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: 10px; background: #eaf7f4; color: #1fa89d;
 }
-.race-close:hover { background: #a00; }
-.race-prompt-display {
-  padding: 8px 16px; background: #0d1117; border-bottom: 1px solid #1a1a3e;
-  font-size: 11px; color: #8a8a9a; max-height: 40px; overflow: hidden;
+.panel-card .panel-body {
+  flex: 1; overflow-y: auto; padding: 14px;
 }
-.race-body {
-  flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 0; overflow: hidden;
+.panel-card .panel-body::-webkit-scrollbar { width: 6px; }
+.panel-card .panel-body::-webkit-scrollbar-track { background: transparent; }
+.panel-card .panel-body::-webkit-scrollbar-thumb { background: #c0d8d4; border-radius: 3px; }
+
+/* ── Agent Prompts panel ── */
+.agent-prompt {
+  margin-bottom: 10px; padding: 12px;
+  background: #f7fbfa; border-radius: 4px;
+  border: 1px solid #e3eeeb; transition: border-color 0.3s;
 }
-.race-side {
-  display: flex; flex-direction: column; overflow: hidden; padding: 0;
+.agent-prompt.active { border-color: #1fa89d; background: #f0faf8; }
+.agent-prompt.submitted { border-color: #2d9d6a; background: #f1f9f4; }
+.agent-prompt.failed { border-color: #d94f4f; background: #fdf4f3; }
+.agent-prompt-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
 }
-.race-side.cerebras { border-right: 2px solid #5cb85c; }
-.race-side.gpu { border-left: 2px solid #e74c3c; }
-.race-side-header {
-  padding: 10px 16px; font-size: 14px; font-weight: bold; text-transform: uppercase;
-  letter-spacing: 2px; display: flex; justify-content: space-between; align-items: center;
+.agent-label {
+  font-family: 'Mulish', sans-serif; font-size: 12px; font-weight: 700;
+  color: #1fa89d;
 }
-.race-side.cerebras .race-side-header {
-  background: linear-gradient(90deg, #0d1f0d, #0d1117); color: #5cb85c;
-  border-bottom: 1px solid #2d6a2d;
+.agent-status {
+  font-family: 'Mulish', sans-serif; font-size: 10px; font-weight: 700;
+  padding: 2px 9px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px;
 }
-.race-side.gpu .race-side-header {
-  background: linear-gradient(90deg, #1f0d0d, #0d1117); color: #e74c3c;
-  border-bottom: 1px solid #8b0000;
+.agent-status.idle { background: #eef3f2; color: #8fa3a0; }
+.agent-status.busy { background: #fff4e0; color: #e09a2a; }
+.agent-status.done { background: #e3f7ec; color: #2d9d6a; }
+.agent-status.failed { background: #fdecea; color: #d94f4f; }
+.agent-prompt .task-desc { font-size: 12px; color: #2a3a38; margin-bottom: 4px; line-height: 1.4; font-weight: 500; }
+.agent-prompt .task-sub { font-size: 11px; color: #6a8480; line-height: 1.4; }
+.agent-prompt .deps { font-size: 10px; color: #9bb5b1; margin-top: 4px; }
+.agent-prompt-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+.agent-prompt .verify-info { font-size: 10px; color: #8fa3a0; }
+
+/* Node badge for agent cards */
+.node-badge {
+  display: inline-block; background: #222b2a; color: #d4f5ef;
+  font-family: 'Jost', sans-serif; font-size: 9px; font-weight: 600;
+  padding: 2px 7px; border-radius: 3px; letter-spacing: 0.8px; margin-right: 8px;
 }
-.race-timer {
-  font-size: 28px; font-weight: bold; font-variant-numeric: tabular-nums;
+
+/* ── Task DAG panel ── */
+.task-queue-inner { display: flex; flex-direction: column; gap: 14px; }
+.layer-group { margin-bottom: 6px; }
+.layer-header {
+  font-family: 'Jost', sans-serif; font-size: 12px; font-weight: 600; color: #1f2d2c;
+  margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
 }
-.race-side.cerebras .race-timer { color: #5cb85c; }
-.race-side.gpu .race-timer { color: #e74c3c; }
-.race-model-name { font-size: 10px; color: #8a8a9a; font-weight: normal; text-transform: none; letter-spacing: 0; }
-.race-tasks { flex: 1; overflow-y: auto; padding: 10px; }
-.race-task-card {
-  margin-bottom: 8px; padding: 10px; border-radius: 6px;
-  border: 1px solid #1a1a3e; background: #111827; transition: all 0.3s;
+.layer-header .layer-status {
+  font-family: 'Mulish', sans-serif; font-size: 9px; font-weight: 700;
+  padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px;
 }
-.race-side.cerebras .race-task-card { border-left: 3px solid #333; }
-.race-side.gpu .race-task-card { border-left: 3px solid #333; }
-.race-task-card.active { border-left-color: #f5a623; background: #1a150d; }
-.race-task-card.done { border-left-color: #5cb85c; background: #0d150d; }
-.race-task-card.error { border-left-color: #e74c3c; background: #1a0808; }
-.race-task-name { font-size: 11px; font-weight: bold; color: #e0e0e0; margin-bottom: 4px; }
-.race-task-status { font-size: 9px; padding: 2px 6px; border-radius: 3px; display: inline-block; }
-.race-task-status.pending { background: #1a1a2e; color: #666; }
-.race-task-status.running { background: #2a2a1a; color: #f5a623; }
-.race-task-status.done { background: #0d1f0d; color: #5cb85c; }
-.race-task-status.error { background: #2e1a1a; color: #e74c3c; }
-.race-task-latency { font-size: 14px; font-weight: bold; float: right; }
-.race-task-output {
-  margin-top: 6px; padding: 6px; background: #0a0a0f; border-radius: 4px;
-  font-size: 9px; color: #aaa; max-height: 150px; overflow-y: auto;
+.layer-status.pending { background: #eef3f2; color: #8fa3a0; }
+.layer-status.collecting { background: #e0f0fa; color: #2a8fb8; }
+.layer-status.verifying { background: #f0e0fa; color: #8b4fb0; }
+.layer-status.ready { background: #e3f7ec; color: #2d9d6a; }
+.layer-status.attesting { background: #fff4e0; color: #e09a2a; }
+.layer-status.attested { background: #e3f7ec; color: #2d9d6a; }
+.layer-status.failed { background: #fdecea; color: #d94f4f; }
+
+.task-card {
+  padding: 10px 12px; margin-bottom: 6px; background: #f3f8f7; border-radius: 4px;
+  border-left: 3px solid #c0d8d4; font-size: 12px; transition: all 0.3s;
+  position: relative; overflow: hidden;
+}
+.task-card.pending { border-left-color: #c0d8d4; }
+.task-card.dispatched { border-left-color: #1fa89d; background: #ecf8f5; }
+.task-card.submitted { border-left-color: #8b4fb0; background: #f5f0fa; }
+.task-card.verified { border-left-color: #2d9d6a; background: #eff8f3; }
+.task-card.confirmed { border-left-color: #2d9d6a; background: #e8f5ee; }
+.task-card.failed { border-left-color: #d94f4f; background: #fdf4f3; }
+.task-card .task-id { font-family: 'Mulish', sans-serif; font-weight: 700; color: #1f2d2c; }
+.task-card .task-agent { color: #1fa89d; font-size: 11px; font-weight: 600; margin-left: 6px; }
+.task-card .task-verify { color: #8fa3a0; font-size: 10px; margin-left: 6px; }
+.task-card .task-name { color: #3a4a48; font-size: 12px; font-weight: 500; }
+.task-card .task-time { color: #9bb5b1; font-size: 10px; float: right; }
+.task-card .task-progress { margin-top: 5px; padding: 3px 7px; background: #fff; border-radius: 3px; font-size: 10px; }
+
+.task-output-preview {
+  margin-top: 6px; padding: 6px 8px; background: #fff; border-radius: 3px;
+  font-size: 10px; color: #5a706c; max-height: 80px; overflow: hidden;
+  white-space: pre-wrap; word-wrap: break-word; position: relative;
+}
+.task-output-preview::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 24px;
+  background: linear-gradient(transparent, #fff);
+}
+.batch-summary {
+  padding: 8px 10px; margin-top: 6px; background: #e8f5ee; border-radius: 4px;
+  border: 1px solid #b8e0c8; font-size: 11px; color: #2d9d6a; font-weight: 600;
+}
+
+/* Task results (agent panel) */
+.task-result {
+  margin-top: 6px; padding: 8px; background: #f7fbfa; border-radius: 4px;
+  border: 1px solid #e3eeeb; font-size: 11px; color: #4a605c; max-height: 120px; overflow-y: auto;
   white-space: pre-wrap; word-wrap: break-word;
 }
-.race-task-output-label { font-size: 8px; color: #5cb85c; margin-bottom: 2px; text-transform: uppercase; }
-.race-finish-banner {
-  padding: 16px; text-align: center; background: #0d1117; border-top: 1px solid #1a1a3e;
-  display: none;
+.task-result-label { font-size: 10px; color: #2d9d6a; font-weight: 700; margin-bottom: 3px; }
+.task-result-empty { color: #9bb5b1; font-style: italic; }
+.task-card .task-result-inline {
+  margin-top: 5px; padding: 5px 7px; background: #fff; border-radius: 3px;
+  font-size: 10px; color: #5a706c; max-height: 80px; overflow-y: auto;
+  white-space: pre-wrap; word-wrap: break-word; border-top: 1px solid #eaf2f0;
 }
-.race-finish-banner.active { display: block; }
-.race-speedup { font-size: 36px; font-weight: bold; }
-.race-speedup.cerebras { color: #5cb85c; }
-.race-speedup.gpu { color: #e74c3c; }
-.race-finish-detail { font-size: 11px; color: #8a8a9a; margin-top: 4px; }
 
-/* Race decomposition bar (shared) */
+/* ── On-Chain Ledger panel ── */
+.confirmation-card {
+  padding: 14px; margin-bottom: 10px; background: #f7fbfa; border-radius: 4px;
+  border-left: 3px solid #1fa89d;
+}
+.confirmation-card.pending { border-left-color: #e09a2a; opacity: 0.85; }
+.confirmation-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.confirmation-layer { font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 600; color: #1f2d2c; }
+.confirmation-sig { font-family: 'Mulish', sans-serif; font-size: 10px; color: #8fa3a0; font-family: monospace; }
+.confirmation-details { font-size: 11px; color: #4a605c; line-height: 1.6; }
+.confirmation-details .label { color: #8fa3a0; font-weight: 600; }
+.confirmation-tasks { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 5px; }
+.confirmation-task {
+  padding: 2px 9px; background: #eaf7f4; border-radius: 10px;
+  font-size: 10px; color: #1fa89d; font-weight: 600;
+}
+.confirmation-empty {
+  text-align: center; padding: 48px 24px; color: #9bb5b1; font-size: 13px;
+  font-family: 'Mulish', sans-serif; line-height: 1.6;
+}
+.cost-display { font-family: 'Jost', sans-serif; font-size: 18px; color: #1fa89d; font-weight: 700; }
+.savings-badge {
+  display: inline-block; padding: 3px 10px; background: #e3f7ec; border-radius: 10px;
+  font-size: 11px; color: #2d9d6a; margin-top: 6px; font-weight: 600;
+}
+
+/* ── Hidden panels (escrow, benchmark) ── */
+#escrow-panel, #benchmark-panel { display: none; }
+#escrow-balance-bar { margin-bottom: 12px; padding: 12px; background: #f7fbfa; border-radius: 4px; border: 1px solid #e3eeeb; }
+#escrow-balance-bar .escrow-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+#escrow-balance-bar .escrow-lbl { font-size: 10px; color: #8fa3a0; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+#escrow-balance-text { font-family: 'Jost', sans-serif; font-size: 16px; font-weight: 700; color: #e09a2a; }
+.escrow-track { height: 8px; background: #eaf2f0; border-radius: 4px; overflow: hidden; }
+#escrow-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #e09a2a, #2d9d6a); border-radius: 4px; transition: width 0.5s; }
+.escrow-sub { display: flex; justify-content: space-between; font-size: 10px; color: #8fa3a0; margin-top: 4px; }
+#agent-wallets { display: grid; gap: 6px; }
+#escrow-proofs { margin-top: 10px; }
+
+#bench-summary { margin-bottom: 12px; padding: 12px; background: #f7fbfa; border-radius: 4px; border: 1px solid #e3eeeb; }
+#bench-summary .bench-title { font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 600; color: #e09a2a; margin-bottom: 6px; }
+#bench-total-speedup { font-family: 'Jost', sans-serif; font-size: 28px; font-weight: 700; color: #2d9d6a; }
+#bench-summary .bench-sub { font-size: 11px; color: #8fa3a0; }
+
+/* ── Race CTA ── */
+.race-cta {
+  text-align: center; padding: 24px 36px 10px 36px;
+}
+.race-cta .cta-text {
+  font-family: 'Jost', sans-serif; font-size: 28px; font-weight: 600;
+  color: rgba(255,255,255,0.75); letter-spacing: -0.3px;
+}
+.race-cta .cta-text .arrow { color: #d4f5ef; }
+
+/* ── Footer ── */
+.app-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 36px 18px 36px;
+  font-family: 'Mulish', sans-serif; font-size: 11px; color: rgba(255,255,255,0.7);
+}
+.app-footer .footer-links { display: flex; gap: 18px; }
+.app-footer .footer-links a { color: rgba(255,255,255,0.85); text-decoration: none; }
+.app-footer .footer-links a:hover { text-decoration: underline; }
+
+/* ── Race slide-out panel (right side overlay) ── */
+.race-backdrop {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0); z-index: 9998; display: none;
+  transition: background 0.4s;
+}
+.race-backdrop.active { display: block; background: rgba(0,0,0,0.3); }
+.race-overlay {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  width: 52%;
+  background: linear-gradient(180deg, #16a298 0%, #23a3a3 45%, #39b8b0 100%);
+  z-index: 9999; display: none;
+  flex-direction: column; overflow: hidden;
+  transform: translateX(100%);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: -8px 0 30px rgba(0,0,0,0.25);
+}
+.race-overlay.active { display: flex; transform: translateX(0); }
+.race-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 18px;
+}
+.race-header h1 {
+  font-family: 'Jost', sans-serif; font-size: 18px; font-weight: 700; color: #ffffff;
+}
+.race-close {
+  background: #fff; color: #1fa89d; border: none; border-radius: 20px;
+  padding: 6px 16px; cursor: pointer; font-family: 'Mulish', sans-serif; font-size: 13px; font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.race-close:hover { background: #f0f9f7; transform: scale(1.05); }
+.race-prompt-display {
+  padding: 6px 18px; font-size: 11px; color: rgba(255,255,255,0.8);
+  max-height: 32px; overflow: hidden; font-family: 'Mulish', sans-serif;
+}
 .race-decomp {
-  padding: 8px 16px; background: #0d1117; border-bottom: 1px solid #1a1a3e;
-  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  padding: 6px 18px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
 }
-.race-decomp-label { font-size: 9px; color: #8a8a9a; text-transform: uppercase; letter-spacing: 1px; }
+.race-decomp-label {
+  font-family: 'Jost', sans-serif; font-size: 10px; color: rgba(255,255,255,0.7);
+  text-transform: uppercase; letter-spacing: 1px; font-weight: 600;
+}
 .race-decomp-layer {
-  display: flex; align-items: center; gap: 6px; padding: 4px 10px;
-  background: #1a1a2e; border-radius: 4px; border: 1px solid #333;
+  display: flex; align-items: center; gap: 6px; padding: 5px 12px;
+  background: rgba(255,255,255,0.15); border-radius: 4px; border: 1px solid rgba(255,255,255,0.2);
 }
-.race-decomp-layer-num { font-size: 14px; font-weight: bold; color: #f5a623; }
-.race-decomp-layer-name { font-size: 10px; color: #e0e0e0; }
-.race-decomp-layer-tasks { font-size: 9px; color: #5bc0de; }
-.race-decomp-arrow { color: #333; font-size: 14px; }
+.race-decomp-layer-num { font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 700; color: #ffe5a0; }
+.race-decomp-layer-name { font-size: 11px; color: #fff; font-family: 'Mulish', sans-serif; }
+.race-decomp-layer-tasks { font-size: 10px; color: #d4f5ef; }
+.race-decomp-arrow { color: rgba(255,255,255,0.4); font-size: 14px; }
 
-/* Race layer group in task list */
-.race-layer-group { margin-bottom: 10px; }
-.race-layer-header {
-  font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
-  padding: 4px 8px; border-radius: 3px; margin-bottom: 6px; display: flex; justify-content: space-between;
-}
-.race-side.cerebras .race-layer-header { background: #0d1f0d; color: #5cb85c; border-left: 2px solid #5cb85c; }
-.race-side.gpu .race-layer-header { background: #1f0d0d; color: #e74c3c; border-left: 2px solid #e74c3c; }
-.race-layer-status { font-size: 9px; padding: 1px 6px; border-radius: 3px; font-weight: normal; }
-.race-layer-status.dispatching { background: #2a2a1a; color: #f5a623; }
-.race-layer-status.attested { background: #0d1f0d; color: #5cb85c; }
-
-/* Race attestation chip */
-.race-attest {
-  display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin: 4px 0;
-  background: #111827; border-radius: 4px; border-left: 3px solid #5cb85c;
-  font-size: 10px;
-}
-.race-attest-icon { font-size: 14px; }
-.race-attest-detail { color: #aaa; }
-.race-attest-sig { color: #555; font-size: 9px; }
-
-/* Race escrow bar */
-.race-escrow {
-  padding: 8px; margin-top: 6px; background: #0d1117; border-radius: 4px; border: 1px solid #1a1a3e;
-}
-.race-escrow-label { font-size: 9px; color: #8a8a9a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-.race-escrow-bar { height: 8px; background: #1a1a2e; border-radius: 4px; overflow: hidden; }
-.race-escrow-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
-.race-side.cerebras .race-escrow-fill { background: linear-gradient(90deg, #5cb85c, #f5a623); }
-.race-side.gpu .race-escrow-fill { background: linear-gradient(90deg, #e74c3c, #f5a623); }
-.race-escrow-detail { display: flex; justify-content: space-between; font-size: 9px; color: #666; margin-top: 3px; }
-.race-escrow-wallet { font-size: 10px; color: #f5a623; margin-top: 3px; }
-
-/* Race progress stepper */
 .race-stepper {
-  display: flex; align-items: center; gap: 0; padding: 10px 16px;
-  background: #0d1117; border-bottom: 1px solid #1a1a3e;
+  display: flex; align-items: center; gap: 0; padding: 6px 18px;
+  flex-wrap: nowrap; overflow-x: auto;
 }
 .race-step {
-  display: flex; align-items: center; gap: 6px; padding: 4px 12px;
-  border-radius: 4px; font-size: 10px; color: #555; white-space: nowrap;
-  transition: all 0.3s;
+  display: flex; align-items: center; gap: 6px; padding: 3px 8px;
+  border-radius: 4px; font-size: 10px; color: rgba(255,255,255,0.6); white-space: nowrap;
+  transition: all 0.3s; font-family: 'Mulish', sans-serif; font-weight: 600;
 }
 .race-step-circle {
-  width: 18px; height: 18px; border-radius: 50%; border: 2px solid #333;
+  width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3);
   display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: bold; color: #555; flex-shrink: 0;
+  font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.6); flex-shrink: 0;
   transition: all 0.3s;
 }
-.race-step.pending .race-step-circle { border-color: #333; color: #555; }
-.race-step.active .race-step-circle { border-color: #f5a623; color: #f5a623; background: #2a2a1a; }
-.race-step.done .race-step-circle { border-color: #5cb85c; background: #5cb85c; color: #0a0a0f; }
-.race-step.done .race-step-label { color: #5cb85c; }
-.race-step.active .race-step-label { color: #f5a623; }
-.race-step.pending .race-step-label { color: #555; }
-.race-step-arrow { color: #333; font-size: 12px; margin: 0 2px; }
-.race-step-label { font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+.race-step.pending .race-step-circle { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.5); }
+.race-step.active .race-step-circle { border-color: #ffe5a0; color: #ffe5a0; background: rgba(255,229,160,0.2); }
+.race-step.done .race-step-circle { border-color: #6ee7d7; background: #6ee7d7; color: #178f86; }
+.race-step.done .race-step-label { color: #d4f5ef; }
+.race-step.active .race-step-label { color: #ffe5a0; }
+.race-step.pending .race-step-label { color: rgba(255,255,255,0.5); }
+.race-step-arrow { color: rgba(255,255,255,0.3); font-size: 12px; margin: 0 3px; }
+.race-step-label { text-transform: uppercase; letter-spacing: 0.5px; }
+
+.race-body {
+  flex: 1; display: flex; flex-direction: column; gap: 10px; overflow: hidden; padding: 0 14px 10px;
+}
+.race-side {
+  display: flex; flex-direction: column; overflow: hidden;
+  background: #ffffff; border-radius: 4px; box-shadow: 0 2px 12px rgba(0,60,55,0.14);
+  flex: 1; min-height: 0;
+}
+.race-side.cerebras { border-top: 4px solid #1fa89d; }
+.race-side.gpu { border-top: 4px solid #e2605a; }
+.race-side-header {
+  padding: 10px 14px; font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px; display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid #eaf2f0;
+}
+.race-side.cerebras .race-side-header { color: #1fa89d; }
+.race-side.gpu .race-side-header { color: #e2605a; }
+.race-timer {
+  font-family: 'Jost', sans-serif; font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.race-side.cerebras .race-timer { color: #1fa89d; }
+.race-side.gpu .race-timer { color: #e2605a; }
+.race-model-name { font-size: 11px; color: #8fa3a0; font-weight: 500; text-transform: none; letter-spacing: 0; font-family: 'Mulish', sans-serif; }
+
+.race-tasks { flex: 1; overflow-y: auto; padding: 12px; }
+.race-tasks::-webkit-scrollbar { width: 6px; }
+.race-tasks::-webkit-scrollbar-thumb { background: #c0d8d4; border-radius: 3px; }
+
+.race-layer-group { margin-bottom: 12px; }
+.race-layer-header {
+  font-family: 'Jost', sans-serif; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
+  padding: 5px 10px; border-radius: 3px; margin-bottom: 8px; display: flex; justify-content: space-between;
+}
+.race-side.cerebras .race-layer-header { background: #eaf7f4; color: #1fa89d; border-left: 3px solid #1fa89d; }
+.race-side.gpu .race-layer-header { background: #fdecea; color: #e2605a; border-left: 3px solid #e2605a; }
+.race-layer-status { font-size: 9px; padding: 2px 8px; border-radius: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Mulish', sans-serif; }
+.race-layer-status.dispatching { background: #fff4e0; color: #e09a2a; }
+.race-layer-status.attested { background: #e3f7ec; color: #2d9d6a; }
+
+.race-task-card {
+  margin-bottom: 8px; padding: 10px 12px; border-radius: 4px;
+  border: 1px solid #e3eeeb; background: #f7fbfa; transition: all 0.3s;
+}
+.race-side.cerebras .race-task-card { border-left: 3px solid #c0d8d4; }
+.race-side.gpu .race-task-card { border-left: 3px solid #e0c8c0; }
+.race-task-card.active { border-left-color: #e09a2a; background: #fff8ea; }
+.race-side.cerebras .race-task-card.done { border-left-color: #1fa89d; background: #ecf8f5; }
+.race-side.gpu .race-task-card.done { border-left-color: #e2605a; background: #fdedea; }
+.race-task-card.error { border-left-color: #d94f4f; background: #fdf4f3; }
+.race-task-name { font-family: 'Mulish', sans-serif; font-size: 12px; font-weight: 700; color: #1f2d2c; margin-bottom: 5px; }
+.race-task-status { font-family: 'Mulish', sans-serif; font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 10px; display: inline-block; text-transform: uppercase; letter-spacing: 0.5px; }
+.race-task-status.pending { background: #eef3f2; color: #8fa3a0; }
+.race-task-status.running { background: #fff4e0; color: #e09a2a; }
+.race-side.cerebras .race-task-status.done { background: #e3f7ec; color: #1fa89d; }
+.race-side.gpu .race-task-status.done { background: #fdecea; color: #e2605a; }
+.race-task-status.error { background: #fdecea; color: #d94f4f; }
+.race-task-latency { font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 700; float: right; }
+.race-task-output {
+  margin-top: 6px; padding: 7px; background: #fff; border-radius: 4px;
+  font-size: 10px; color: #5a706c; max-height: 140px; overflow-y: auto;
+  white-space: pre-wrap; word-wrap: break-word; font-family: 'Mulish', sans-serif;
+}
+.race-task-output-label { font-size: 9px; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+.race-side.cerebras .race-task-output-label { color: #1fa89d; }
+.race-side.gpu .race-task-output-label { color: #e2605a; }
+
+.race-attest {
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px; margin: 5px 0;
+  background: #ecf8f5; border-radius: 4px; border-left: 3px solid #1fa89d;
+  font-size: 11px; font-family: 'Mulish', sans-serif;
+}
+.race-side.gpu .race-attest { background: #fdedea; border-left-color: #e2605a; }
+.race-attest-icon { font-size: 14px; }
+.race-attest-detail { color: #4a605c; }
+.race-attest-sig { color: #8fa3a0; font-size: 9px; font-family: monospace; }
+
+.race-escrow {
+  padding: 10px; margin-top: 6px; background: #f7fbfa; border-radius: 4px; border: 1px solid #e3eeeb; margin: 6px 12px 12px 12px;
+}
+.race-escrow-label { font-family: 'Jost', sans-serif; font-size: 10px; color: #8fa3a0; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; font-weight: 600; }
+.race-escrow-bar { height: 8px; background: #eaf2f0; border-radius: 4px; overflow: hidden; }
+.race-escrow-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+.race-side.cerebras .race-escrow-fill { background: linear-gradient(90deg, #1fa89d, #ffe5a0); }
+.race-side.gpu .race-escrow-fill { background: linear-gradient(90deg, #e2605a, #ffe5a0); }
+.race-escrow-detail { display: flex; justify-content: space-between; font-size: 10px; color: #8fa3a0; margin-top: 4px; font-family: 'Mulish', sans-serif; }
+.race-escrow-wallet { font-family: 'Jost', sans-serif; font-size: 11px; color: #e09a2a; margin-top: 4px; font-weight: 600; }
+
+.race-finish-banner {
+  padding: 14px 18px; text-align: center; display: none;
+  background: rgba(255,255,255,0.1); border-top: 1px solid rgba(255,255,255,0.2);
+}
+.race-finish-banner.active { display: block; }
+.race-speedup { font-family: 'Jost', sans-serif; font-size: 32px; font-weight: 700; }
+.race-speedup.cerebras { color: #d4f5ef; }
+.race-speedup.gpu { color: #ffd0cc; }
+.race-finish-detail { font-size: 12px; color: rgba(255,255,255,0.85); margin-top: 5px; font-family: 'Mulish', sans-serif; font-weight: 500; }
+
+.race-finish-stamp {
+  font-family: 'Jost', sans-serif; font-size: 11px; font-weight: 700; padding: 3px 12px; border-radius: 4px;
+}
+.race-side.cerebras .race-finish-stamp { background: #e3f7ec; color: #1fa89d; border: 1px solid #8fd8cd; }
+.race-side.gpu .race-finish-stamp { background: #fdecea; color: #e2605a; border: 1px solid #e8a8a3; }
+
+/* Hidden file input */
+#image-upload { display: none; }
+/* WS url input (kept for functionality, hidden in header) */
+#ws-url { display: none; }
 </style>
 </head>
 <body>
 
 <!-- ── Header ── -->
-<div class="header">
-  <h1>Multi-Agent Orchestrator</h1>
-  <div class="controls">
-    <input type="text" id="ws-url" value="ws://localhost:8765" placeholder="WebSocket URL">
-    <button id="btn-connect" class="btn-connect" onclick="connectWS()">Connect</button>
-    <button id="btn-plan" class="btn-action" onclick="planAndSubmit()" disabled>Plan &amp; Submit</button>
-    <button id="btn-start" class="btn-action" onclick="startPipeline()" disabled>Start Pipeline</button>
-    <button id="btn-bench" class="btn-small" onclick="runBenchmark()">⚡ Benchmark</button>
-    <button id="btn-race" class="btn-small" onclick="startRace()" style="background:#2a2a1a;color:#f5a623;font-weight:bold;">🏁 Race</button>
-    <span id="speedup-badge" style="display:none;font-size:13px;font-weight:bold;color:#5cb85c;background:#0d1f0d;padding:4px 10px;border-radius:4px;border:1px solid #2d6a2d;">⚡ 37.1x faster</span>
+<header class="app-header">
+  <div class="brand">
+    <div class="logo-mark">C</div>
+    Cerebrain
   </div>
-</div>
-
-<!-- ── User Prompt ── -->
-<div style="padding:10px;background:#0d1117;border-bottom:1px solid #1a1a3e;">
-  <div style="display:flex;gap:10px;align-items:flex-start;">
-    <textarea id="user-prompt" placeholder="Describe what you want the agents to do... (e.g. Research IBM sub-nm chip and Huawei LogicFolding, then create a synthesis report merging both)" style="flex:1;min-height:80px;background:#0a0a0f;border:1px solid #1a1a3e;color:#e0e0e0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;box-sizing:border-box;" oninput="updatePlanButton()"></textarea>
-    <div style="display:flex;flex-direction:column;gap:6px;align-items:center;">
-      <label for="image-upload" style="cursor:pointer;background:#1a1a2e;border:1px solid #333;border-radius:6px;padding:8px 12px;font-size:11px;color:#5bc0de;white-space:nowrap;text-align:center;transition:all 0.2s;" onmouseover="this.style.borderColor='#0f3460'" onmouseout="this.style.borderColor='#333'">
-        📷 Image
-      </label>
-      <input type="file" id="image-upload" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
-      <img id="image-preview" style="display:none;max-width:80px;max-height:80px;border-radius:6px;border:1px solid #333;" />
-      <button id="image-clear" style="display:none;font-size:9px;background:#2e1a1a;color:#e74c3c;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;" onclick="clearImage()">remove</button>
+  <div class="header-right">
+    <div class="conn-status">
+      <span class="conn-dot offline" id="conn-dot"></span>
+      <span id="conn-text">Disconnected</span>
     </div>
+    <input type="text" id="ws-url" value="ws://localhost:8765" placeholder="WebSocket URL">
+    <button id="btn-connect" class="nav-item" onclick="connectWS()">Connect</button>
+    <nav class="nav-items">
+      <button class="nav-item" onclick="startPipeline()" id="btn-start" disabled>Start Pipeline</button>
+      <span class="nav-sep">|</span>
+      <button class="nav-item" onclick="runBenchmark()" id="btn-bench">Benchmark</button>
+      <span class="nav-sep">|</span>
+      <button class="nav-item race" onclick="startRace()" id="btn-race">▶ Race</button>
+      <span class="nav-sep">|</span>
+      <button class="nav-item" onclick="showHelp()">Help</button>
+    </nav>
+    <span class="speedup-badge" id="speedup-badge">⚡ 37.1x faster</span>
   </div>
-  <div id="planner-status" style="font-size:10px;color:#8a8a9a;margin-top:4px;"></div>
-</div>
+</header>
 
-<!-- ── Summary bar ── -->
-<div class="summary-bar">
+<!-- ── Search / Prompt bar ── -->
+<section class="search-section">
+  <div class="search-bar">
+    <textarea id="user-prompt" class="prompt-input" placeholder="Describe what you want the agents to do…" oninput="updatePlanButton()"></textarea>
+    <label for="image-upload" class="image-btn">📷 Image</label>
+    <input type="file" id="image-upload" accept="image/*" onchange="handleImageUpload(event)">
+    <div class="image-preview-wrap">
+      <img id="image-preview" alt="preview" />
+      <button id="image-clear" onclick="clearImage()">remove</button>
+    </div>
+    <button id="btn-plan" class="plan-btn" onclick="planAndSubmit()" disabled>Plan &amp; Submit ➜</button>
+  </div>
+  <div class="planner-status" id="planner-status"></div>
+</section>
+
+<!-- ── Prompt history timeline ── -->
+<section class="prompt-history" id="prompt-history">
+  <span class="hist-label">History</span>
+  <div class="hist-item active">
+    <span>Research IBM sub-nm chip…</span>
+    <span class="hist-date">Today</span>
+  </div>
+  <div class="hist-item">
+    <span>Build a React todo app…</span>
+    <span class="hist-date">Yesterday</span>
+  </div>
+  <div class="hist-item">
+    <span>Analyze Q3 earnings report…</span>
+    <span class="hist-date">Jun 28</span>
+  </div>
+</section>
+
+<!-- ── Summary + Budget strip ── -->
+<div class="summary-strip">
   <div class="stat-cell"><div class="val" id="stat-tasks">0</div><div class="lbl">Tasks</div></div>
   <div class="stat-cell"><div class="val" id="stat-layers">0</div><div class="lbl">Batches</div></div>
   <div class="stat-cell"><div class="val" id="stat-confirmed">0</div><div class="lbl">Confirmed</div></div>
@@ -320,87 +653,82 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Monaco', mo
   <div class="stat-cell"><div class="val" id="stat-savings">0</div><div class="lbl">Txs Saved</div></div>
 </div>
 
-<!-- ── Budget + Escrow bar ── -->
-<div id="escrow-bar" style="padding:8px 16px;background:#0d1117;border-bottom:1px solid #1a1a3e;display:flex;align-items:center;gap:16px;">
-  <div style="font-size:10px;color:#8a8a9a;text-transform:uppercase;letter-spacing:1px;">Budget</div>
-  <div style="flex:1;height:12px;background:#1a1a2e;border-radius:6px;overflow:hidden;position:relative;">
-    <div id="budget-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#5cb85c,#f5a623);border-radius:6px;transition:width 0.5s;"></div>
-    <div id="budget-label" style="position:absolute;top:0;left:50%;transform:translateX(-50%);font-size:9px;color:#e0e0e0;line-height:12px;white-space:nowrap;">$0.00 / $5.00</div>
+<div class="budget-strip" id="escrow-bar">
+  <span class="budget-label">Budget</span>
+  <div class="budget-track">
+    <div id="budget-fill"></div>
+    <div id="budget-label">$0.00 / $5.00</div>
   </div>
-  <div id="stripe-mode-badge" style="font-size:10px;padding:2px 8px;border-radius:3px;background:#1a1a2e;color:#8a8a9a;">MOCK</div>
+  <span id="stripe-mode-badge">MOCK</span>
 </div>
 
-<!-- ── Three panels ── -->
-<div class="main">
+<!-- ── Three-panel grid ── -->
+<div class="main-grid">
 
-  <!-- ════ Section 1: Agent Prompts ════ -->
-  <div class="panel">
+  <!-- ════ Left: Agent Prompts ════ -->
+  <div class="panel-card">
     <div class="panel-header">
       <span>Agent Prompts</span>
-      <span class="badge" id="agent-count-badge" style="background:#1a1a2e; color:#5bc0de;">0 / 10</span>
+      <span class="badge" id="agent-count-badge">0 / 10</span>
     </div>
     <div class="panel-body" id="agent-prompts"></div>
   </div>
 
-  <!-- ════ Section 2: Task Queue / Batching ════ -->
-  <div class="panel">
+  <!-- ════ Center: Task DAG ════ -->
+  <div class="panel-card">
     <div class="panel-header">
-      <span>Task Queue & Batching</span>
-      <span class="badge" id="queue-badge" style="background:#1a1a2e; color:#8a8a9a;">No DAG</span>
+      <span>Task DAG</span>
+      <span class="badge" id="queue-badge">No DAG</span>
     </div>
     <div class="panel-body" id="task-queue"></div>
   </div>
 
-  <!-- ════ Section 3: On-Chain Confirmations ════ -->
-  <div class="panel">
+  <!-- ════ Right: On-Chain Ledger ════ -->
+  <div class="panel-card">
     <div class="panel-header">
-      <span>On-Chain Confirmations</span>
-      <span class="badge" id="confirm-badge" style="background:#1a1a2e; color:#8a8a9a;">0 txs</span>
+      <span>On-Chain Ledger</span>
+      <span class="badge" id="confirm-badge">0 txs</span>
     </div>
     <div class="panel-body" id="confirmations">
       <div class="confirmation-empty">No confirmations yet.<br>Submit tasks and start the pipeline.</div>
     </div>
   </div>
 
-  <!-- ════ Section 4: Escrow & Agent Wallets ════ -->
-  <div class="panel" id="escrow-panel" style="display:none;">
+  <!-- Hidden panels for escrow + benchmark (toggled by JS) -->
+  <div class="panel-card" id="escrow-panel">
     <div class="panel-header">
       <span>🔒 Escrow & Agent Wallets</span>
-      <span class="badge" id="escrow-mode-badge" style="background:#2a2a1a; color:#f5a623;">ESCROW</span>
+      <span class="badge" id="escrow-mode-badge">ESCROW</span>
     </div>
     <div class="panel-body" id="escrow-body">
-      <!-- Escrow balance bar -->
-      <div id="escrow-balance-bar" style="margin-bottom:12px;padding:8px;background:#0d1117;border-radius:6px;border:1px solid #1a1a3e;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-          <span style="font-size:10px;color:#8a8a9a;text-transform:uppercase;letter-spacing:1px;">Escrow Balance</span>
-          <span id="escrow-balance-text" style="font-size:13px;font-weight:bold;color:#f5a623;">$5.00</span>
+      <div id="escrow-balance-bar">
+        <div class="escrow-row">
+          <span class="escrow-lbl">Escrow Balance</span>
+          <span id="escrow-balance-text">$5.00</span>
         </div>
-        <div style="height:8px;background:#1a1a2e;border-radius:4px;overflow:hidden;">
-          <div id="escrow-fill" style="height:100%;width:100%;background:linear-gradient(90deg,#f5a623,#5cb85c);border-radius:4px;transition:width 0.5s;"></div>
+        <div class="escrow-track">
+          <div id="escrow-fill"></div>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:9px;color:#666;margin-top:3px;">
+        <div class="escrow-sub">
           <span id="escrow-released-text">Released: $0.00</span>
           <span id="escrow-held-text">Held: $5.00</span>
         </div>
       </div>
-      <!-- Agent wallets table -->
-      <div id="agent-wallets" style="display:grid;gap:4px;"></div>
-      <!-- Solana proofs -->
-      <div id="escrow-proofs" style="margin-top:8px;"></div>
+      <div id="agent-wallets"></div>
+      <div id="escrow-proofs"></div>
     </div>
   </div>
 
-  <!-- ════ Section 5: Speed Benchmark ════ -->
-  <div class="panel" id="benchmark-panel" style="display:none;">
+  <div class="panel-card" id="benchmark-panel">
     <div class="panel-header">
       <span>⚡ Speed Benchmark</span>
-      <span class="badge" id="bench-badge" style="background:#2a2a1a; color:#f5a623;">CEREBRAS vs GPU</span>
+      <span class="badge" id="bench-badge">CEREBRAS vs GPU</span>
     </div>
     <div class="panel-body" id="benchmark-body">
-      <div id="bench-summary" style="margin-bottom:12px;padding:10px;background:#0d1117;border-radius:6px;border:1px solid #1a1a3e;">
-        <div style="font-size:13px;font-weight:bold;color:#f5a623;margin-bottom:6px;">Speed Comparison</div>
-        <div id="bench-total-speedup" style="font-size:24px;font-weight:bold;color:#5cb85c;">--</div>
-        <div style="font-size:10px;color:#8a8a9a;">Cerebras Gemma 4 31B vs GPU GLM-5.2</div>
+      <div id="bench-summary">
+        <div class="bench-title">Speed Comparison</div>
+        <div id="bench-total-speedup">--</div>
+        <div class="bench-sub">Cerebras Gemma 4 31B vs GPU GLM-5.2</div>
       </div>
       <div id="bench-tasks"></div>
     </div>
@@ -408,7 +736,23 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Monaco', mo
 
 </div>
 
-<!-- ── Race Mode Overlay ── -->
+<!-- ── Race CTA ── -->
+<div class="race-cta">
+  <span class="cta-text">Watch them race. <span class="arrow">▶</span></span>
+</div>
+
+<!-- ── Footer ── -->
+<footer class="app-footer">
+  <span>© 2026 Cerebrain · Multi-Agent Orchestrator</span>
+  <div class="footer-links">
+    <a href="javascript:void(0)" onclick="showHelp()">Help</a>
+    <a href="https://hermes-agent.nousresearch.com/docs" target="_blank">Docs</a>
+    <a href="javascript:void(0)">Privacy</a>
+  </div>
+</footer>
+
+<!-- ── Race Mode Slide-Out ── -->
+<div class="race-backdrop" id="race-backdrop" onclick="closeRace()"></div>
 <div class="race-overlay" id="race-overlay">
   <div class="race-header">
     <h1>🏁 Live Race: Cerebras vs GPU</h1>
@@ -438,7 +782,7 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Monaco', mo
       <div class="race-step-circle">4</div>
       <span class="race-step-label">Escrow Payment</span>
     </div>
-    <span style="margin-left:12px;font-size:9px;color:#5cb85c;font-weight:bold;">CEREBRAS</span>
+    <span style="margin-left:14px;font-size:10px;color:#d4f5ef;font-weight:700;font-family:'Jost',sans-serif;">CEREBRAS</span>
   </div>
 
   <!-- GPU progress stepper -->
@@ -462,7 +806,7 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'SF Mono', 'Monaco', mo
       <div class="race-step-circle">4</div>
       <span class="race-step-label">Escrow Payment</span>
     </div>
-    <span style="margin-left:12px;font-size:9px;color:#e74c3c;font-weight:bold;">GPU</span>
+    <span style="margin-left:14px;font-size:10px;color:#ffd0cc;font-weight:700;font-family:'Jost',sans-serif;">GPU</span>
   </div>
 
   <div class="race-body">
@@ -599,9 +943,9 @@ function planAndSubmit() {
 
   const statusDiv = document.getElementById('planner-status');
   if (image) {
-    statusDiv.innerHTML = '<span style="color:#f5a623">Planning: analyzing image with vision model, then decomposing...</span>';
+    statusDiv.innerHTML = '<span style="color:#ffe5a0">Planning: analyzing image with vision model, then decomposing...</span>';
   } else {
-    statusDiv.innerHTML = '<span style="color:#f5a623">Planning: calling Nemotron 3 Ultra to decompose prompt...</span>';
+    statusDiv.innerHTML = '<span style="color:#ffe5a0">Planning: calling Nemotron 3 Ultra to decompose prompt...</span>';
   }
 
   // Send the plan request to the bridge (with optional image)
@@ -629,6 +973,11 @@ function submitSingleTask(agentId) {
   planAndSubmit();
 }
 
+// ── Help ──
+function showHelp() {
+  alert('Cerebrain Multi-Agent Orchestrator\n\n1. Connect to the WebSocket bridge (default ws://localhost:8765).\n2. Type a prompt or upload an image.\n3. Click "Plan & Submit" to decompose into tasks.\n4. Click "Start Pipeline" to dispatch agents.\n5. Click "Race" to run Cerebras vs GPU comparison.\n6. Click "Benchmark" for a speed comparison report.');
+}
+
 // ── WebSocket ──
 function connectWS() {
   const url = document.getElementById('ws-url').value;
@@ -636,7 +985,8 @@ function connectWS() {
 
   ws.onopen = () => {
     document.getElementById('btn-connect').textContent = 'Connected';
-    document.getElementById('btn-connect').style.color = '#5cb85c';
+    document.getElementById('conn-text').textContent = 'Connected';
+    document.getElementById('conn-dot').classList.remove('offline');
     document.getElementById('btn-plan').disabled = false;
     send({type: 'get_status'});
   };
@@ -648,7 +998,8 @@ function connectWS() {
 
   ws.onclose = () => {
     document.getElementById('btn-connect').textContent = 'Connect';
-    document.getElementById('btn-connect').style.color = '#5bc0de';
+    document.getElementById('conn-text').textContent = 'Disconnected';
+    document.getElementById('conn-dot').classList.add('offline');
     document.getElementById('btn-plan').disabled = true;
     document.getElementById('btn-start').disabled = true;
   };
@@ -669,7 +1020,7 @@ function runBenchmark() {
   const btn = document.getElementById('btn-bench');
   if (btn) { btn.textContent = 'Running...'; btn.disabled = true; }
   // Re-enable after 3 min
-  setTimeout(() => { if (btn) { btn.textContent = '⚡ Benchmark'; btn.disabled = false; } }, 180000);
+  setTimeout(() => { if (btn) { btn.textContent = 'Benchmark'; btn.disabled = false; } }, 180000);
 }
 
 // ── Handle incoming messages ──
@@ -679,9 +1030,9 @@ function handleMessage(msg) {
     const statusDiv = document.getElementById('planner-status');
     const d = msg.data;
     if (d.stage === 'starting') {
-      statusDiv.innerHTML = '<span style="color:#5bc0de">⟳ Connecting to Nemotron 3 Ultra via NemoClaw...</span>';
+      statusDiv.innerHTML = '<span style="color:#d4f5ef">⟳ Connecting to Nemotron 3 Ultra via NemoClaw...</span>';
     } else if (d.stage === 'thinking') {
-      statusDiv.innerHTML = '<span style="color:#f5a623">⟳ ' + escapeHtml(d.message) + '</span>';
+      statusDiv.innerHTML = '<span style="color:#ffe5a0">⟳ ' + escapeHtml(d.message) + '</span>';
     }
     // Disable plan button during planning
     document.getElementById('btn-plan').disabled = true;
@@ -692,7 +1043,7 @@ function handleMessage(msg) {
     const tasks = msg.data.tasks || [];
     window.plannedTasks = tasks;
     const statusDiv = document.getElementById('planner-status');
-    statusDiv.innerHTML = `<span style="color:#5cb85c">Planned ${tasks.length} tasks with ${msg.data.total_layers} layers. Click Start Pipeline.</span>`;
+    statusDiv.innerHTML = `<span style="color:#d4f5ef">Planned ${tasks.length} tasks with ${msg.data.total_layers} layers. Click Start Pipeline.</span>`;
 
     // Render the planned tasks in Panel 1
     const container = document.getElementById('agent-prompts');
@@ -705,12 +1056,12 @@ function handleMessage(msg) {
         ? `deps: ${task.dependencies.join(', ')}` : 'no deps';
       div.innerHTML = `
         <div class="agent-prompt-header">
-          <span class="agent-label">${task.id} [${task.agent_id}]</span>
+          <span class="agent-label"><span class="node-badge">NODE</span>${task.id} · ${task.agent_id}</span>
           <span class="agent-status idle" id="status-${task.agent_id}">idle</span>
         </div>
-        <div style="font-size:11px;color:#e0e0e0;margin-bottom:3px;">${escapeHtml(task.name)}</div>
-        <div style="font-size:9px;color:#8a8a9a;">${escapeHtml(task.description.slice(0, 150))}</div>
-        <div style="font-size:9px;color:#555;margin-top:3px;">${deps}</div>
+        <div class="task-desc">${escapeHtml(task.name)}</div>
+        <div class="task-sub">${escapeHtml(task.description.slice(0, 150))}</div>
+        <div class="deps">${deps}</div>
         <div class="task-result" id="result-${task.agent_id}" style="display:none;"></div>
       `;
       container.appendChild(div);
@@ -722,11 +1073,11 @@ function handleMessage(msg) {
     document.getElementById('btn-start').disabled = false;
     // Re-enable plan button
     document.getElementById('btn-plan').disabled = false;
-    document.getElementById('btn-plan').textContent = 'Plan';
+    document.getElementById('btn-plan').textContent = 'Plan & Submit ➜';
   }
   else if (msg.type === 'plan_error') {
     const statusDiv = document.getElementById('planner-status');
-    statusDiv.innerHTML = `<span style="color:#e74c3c">Planning failed: ${msg.data.error}</span>`;
+    statusDiv.innerHTML = `<span style="color:#ffd0cc">Planning failed: ${msg.data.error}</span>`;
   }
   else if (msg.type === 'dag_ready') {
     dagData = msg.data;
@@ -754,8 +1105,8 @@ function handleMessage(msg) {
     const badge = document.getElementById('stripe-mode-badge');
     if (badge) {
       badge.textContent = msg.data.mode ? msg.data.mode.toUpperCase() : 'CHARGING';
-      badge.style.background = '#2a2a1a';
-      badge.style.color = '#f5a623';
+      badge.style.background = 'rgba(255,229,160,0.3)';
+      badge.style.color = '#ffe5a0';
     }
     // Show escrow panel if in escrow mode
     if (msg.data.mode === 'escrow') {
@@ -773,14 +1124,14 @@ function handleMessage(msg) {
       container.innerHTML = '';
     }
     const haltCard = document.createElement('div');
-    haltCard.style.cssText = 'padding:12px;background:#2e1a1a;border-radius:6px;border-left:3px solid #e74c3c;margin-bottom:8px;';
+    haltCard.style.cssText = 'padding:14px;background:#fdecea;border-radius:4px;border-left:3px solid #d94f4f;margin-bottom:10px;';
     haltCard.innerHTML = `
-      <div style="font-size:13px;font-weight:bold;color:#e74c3c;">⚠️ PIPELINE HALTED</div>
-      <div style="font-size:11px;color:#aaa;margin-top:4px;">${escapeHtml(d.message || 'Budget exceeded')}</div>
-      <div style="font-size:10px;color:#666;margin-top:6px;">
+      <div style="font-family:'Jost',sans-serif;font-size:15px;font-weight:700;color:#d94f4f;">⚠️ PIPELINE HALTED</div>
+      <div style="font-size:12px;color:#4a605c;margin-top:5px;">${escapeHtml(d.message || 'Budget exceeded')}</div>
+      <div style="font-size:11px;color:#8fa3a0;margin-top:6px;">
         Layer: ${d.layer} | Spent: $${((d.total_spent_cents||0)/100).toFixed(2)} | Budget: $${((d.budget_cents||0)/100).toFixed(2)}
       </div>
-      <div style="font-size:9px;color:#555;margin-top:4px;">On-chain proof: ${escapeHtml((d.solana_signature||'').slice(0,40))}...</div>
+      <div style="font-size:10px;color:#9bb5b1;margin-top:4px;font-family:monospace;">On-chain proof: ${escapeHtml((d.solana_signature||'').slice(0,40))}...</div>
     `;
     container.insertBefore(haltCard, container.firstChild);
     // Update budget bar to show full
@@ -813,7 +1164,7 @@ function handleMessage(msg) {
   }
   else if (msg.type === 'comparison_planning') {
     const statusDiv = document.getElementById('planner-status');
-    if (statusDiv) statusDiv.innerHTML = '<span style="color:#f5a623">' + escapeHtml(msg.data.message || 'Planning...') + '</span>';
+    if (statusDiv) statusDiv.innerHTML = '<span style="color:#ffe5a0">' + escapeHtml(msg.data.message || 'Planning...') + '</span>';
   }
   else if (msg.type === 'comparison_progress') {
     handleComparisonProgress(msg.data);
@@ -833,7 +1184,7 @@ function handleMessage(msg) {
   else if (msg.type === 'comparison_error') {
     alert('Race error: ' + (msg.data?.error || 'unknown'));
     const btn = document.getElementById('btn-race');
-    if (btn) { btn.textContent = '🏁 Race'; btn.disabled = false; }
+    if (btn) { btn.textContent = '▶ Race'; btn.disabled = false; }
   }
   else if (msg.type === 'status') {
     statusData = msg.data;
@@ -909,8 +1260,8 @@ function renderTaskQueue(data) {
       const deps = plannedTask && plannedTask.dependencies && plannedTask.dependencies.length > 0
         ? plannedTask.dependencies.join(', ') : null;
       const depsHtml = deps
-        ? `<div style="margin-top:3px;font-size:9px;color:#f5a623;">blocked on: ${deps}</div>`
-        : '<div style="margin-top:3px;font-size:9px;color:#5cb85c;">ready (no deps)</div>';
+        ? `<div style="margin-top:4px;font-size:10px;color:#e09a2a;">blocked on: ${deps}</div>`
+        : '<div style="margin-top:4px;font-size:10px;color:#2d9d6a;">ready (no deps)</div>';
       taskDiv.innerHTML = `
         <span class="task-id">${tid}</span>
         <span class="task-agent">[${agents[i] || '?'}]</span>
@@ -959,28 +1310,28 @@ function updateTaskProgress(taskId, agentId, stage, detail) {
   if (card) {
     // Set a progress indicator with stage color
     const stageColors = {
-      'received': '#5bc0de',
-      'calling_model': '#f5a623',
-      'model_calling': '#f5a623',
-      'model_streaming': '#9b59b6',
-      'model_retry': '#e74c3c',
-      'model_done': '#5cb85c',
-      'completed': '#5cb85c',
+      'received': '#1fa89d',
+      'calling_model': '#e09a2a',
+      'model_calling': '#e09a2a',
+      'model_streaming': '#8b4fb0',
+      'model_retry': '#d94f4f',
+      'model_done': '#2d9d6a',
+      'completed': '#2d9d6a',
     };
-    const color = stageColors[stage] || '#8a8a9a';
+    const color = stageColors[stage] || '#8fa3a0';
 
     let progressDiv = card.querySelector('.task-progress');
     if (!progressDiv) {
       progressDiv = document.createElement('div');
       progressDiv.className = 'task-progress';
-      progressDiv.style.cssText = 'margin-top:4px;padding:3px 6px;background:#0a0a0f;border-radius:3px;font-size:9px;';
+      progressDiv.style.cssText = 'margin-top:5px;padding:3px 7px;background:#fff;border-radius:3px;font-size:10px;';
       card.appendChild(progressDiv);
     }
     const time = new Date().toLocaleTimeString();
 
     // For streaming: show a scrolling trace of the model output
     if (stage === 'model_streaming') {
-      progressDiv.innerHTML = `<span style="color:${color}">[${time}] streaming</span>: <span style="color:#aaa;font-size:8px;">${escapeHtml(detail.slice(0, 300))}</span>`;
+      progressDiv.innerHTML = `<span style="color:${color}">[${time}] streaming</span>: <span style="color:#5a706c;font-size:9px;">${escapeHtml(detail.slice(0, 300))}</span>`;
     } else {
       progressDiv.innerHTML = `<span style="color:${color}">[${time}] ${stage}</span>: ${escapeHtml(detail.slice(0, 120))}`;
     }
@@ -991,24 +1342,24 @@ function updateTaskProgress(taskId, agentId, stage, detail) {
   if (resultDiv) {
     resultDiv.style.display = 'block';
     const stageColors2 = {
-      'received': '#5bc0de',
-      'calling_model': '#f5a623',
-      'model_calling': '#f5a623',
-      'model_streaming': '#9b59b6',
-      'model_retry': '#e74c3c',
-      'model_done': '#5cb85c',
-      'completed': '#5cb85c',
+      'received': '#1fa89d',
+      'calling_model': '#e09a2a',
+      'model_calling': '#e09a2a',
+      'model_streaming': '#8b4fb0',
+      'model_retry': '#d94f4f',
+      'model_done': '#2d9d6a',
+      'completed': '#2d9d6a',
     };
-    const color = stageColors2[stage] || '#8a8a9a';
+    const color = stageColors2[stage] || '#8fa3a0';
     const time = new Date().toLocaleTimeString();
 
     if (stage === 'model_streaming') {
       // Show streaming trace: last N chars of model output, scrollable
-      resultDiv.innerHTML = `<div class="task-result-label" style="color:${color}">[${time}] streaming (live)</div><div style="color:#bbb;font-size:9px;max-height:150px;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word;">${escapeHtml(detail)}</div>`;
+      resultDiv.innerHTML = `<div class="task-result-label" style="color:${color}">[${time}] streaming (live)</div><div style="color:#4a605c;font-size:10px;max-height:150px;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word;">${escapeHtml(detail)}</div>`;
     } else if (stage === 'model_done') {
-      resultDiv.innerHTML = `<div class="task-result-label" style="color:${color}">[${time}] ${stage}</div><div style="color:#aaa">${escapeHtml(detail)}</div>`;
+      resultDiv.innerHTML = `<div class="task-result-label" style="color:${color}">[${time}] ${stage}</div><div style="color:#5a706c">${escapeHtml(detail)}</div>`;
     } else {
-      resultDiv.innerHTML = `<div class="task-result-label" style="color:${color}">[${time}] ${stage}</div><div style="color:#aaa">${escapeHtml(detail)}</div>`;
+      resultDiv.innerHTML = `<div class="task-result-label" style="color:${color}">[${time}] ${stage}</div><div style="color:#5a706c">${escapeHtml(detail)}</div>`;
     }
   }
 
@@ -1042,7 +1393,7 @@ function updateAgentResult(agentId, taskId, summary) {
       card.appendChild(resultDiv);
     }
     const cardFullId = `card-full-${taskId}`;
-    resultDiv.innerHTML = `<span style="color:#5cb85c">Result:</span> <span id="${cardFullId}" style="display:inline;max-height:80px;overflow:hidden;">${escapeHtml(summary.slice(0, 200))}</span><a href="javascript:void(0)" onclick="toggleExpand('${cardFullId}', '${taskId}')" style="font-size:9px;color:#5bc0de;margin-left:4px;">[expand]</a>`;
+    resultDiv.innerHTML = `<span style="color:#2d9d6a">Result:</span> <span id="${cardFullId}" style="display:inline;max-height:80px;overflow:hidden;">${escapeHtml(summary.slice(0, 200))}</span><a href="javascript:void(0)" onclick="toggleExpand('${cardFullId}', '${taskId}')" style="font-size:10px;color:#1fa89d;margin-left:4px;">[expand]</a>`;
   }
 
   // Mark agent as done
@@ -1111,11 +1462,11 @@ function addConfirmation(data) {
       &nbsp; <span class="label">Cost:</span> $${((data.cost_cents || 0)/100).toFixed(2)}
     </div>
     ${data.stripe_charge_id ? `
-    <div style="margin-top:4px;font-size:9px;">
-      <span style="color:#5cb85c;">Stripe:</span>
-      <span style="color:#aaa;">${data.stripe_charge_id}</span>
-      &nbsp; <span style="color:#5cb85c;">Remaining:</span>
-      <span style="color:#aaa;">$${((data.remaining_budget_cents||0)/100).toFixed(2)}</span>
+    <div style="margin-top:5px;font-size:10px;">
+      <span style="color:#2d9d6a;">Stripe:</span>
+      <span style="color:#5a706c;">${data.stripe_charge_id}</span>
+      &nbsp; <span style="color:#2d9d6a;">Remaining:</span>
+      <span style="color:#5a706c;">$${((data.remaining_budget_cents||0)/100).toFixed(2)}</span>
     </div>` : ''}
     <div class="confirmation-tasks">${taskChips}</div>
   `;
@@ -1174,11 +1525,11 @@ function updateBudgetBar(data) {
     fill.style.width = pct + '%';
     // Red if over 80%
     if (pct > 80) {
-      fill.style.background = 'linear-gradient(90deg,#f5a623,#e74c3c)';
+      fill.style.background = 'linear-gradient(90deg, #ffe5a0, #e2605a)';
     } else if (pct > 50) {
-      fill.style.background = 'linear-gradient(90deg,#5cb85c,#f5a623)';
+      fill.style.background = 'linear-gradient(90deg, #a8e6dc, #ffe5a0)';
     } else {
-      fill.style.background = 'linear-gradient(90deg,#5cb85c,#5cb85c)';
+      fill.style.background = 'linear-gradient(90deg, #a8e6dc, #a8e6dc)';
     }
   }
   const label = document.getElementById('budget-label');
@@ -1190,8 +1541,8 @@ function updateBudgetBar(data) {
   const badge = document.getElementById('stripe-mode-badge');
   if (badge && data.stripe_mode) {
     badge.textContent = data.stripe_mode.toUpperCase();
-    badge.style.background = data.stripe_mode === 'mock' ? '#1a1a2e' : '#0d1f0d';
-    badge.style.color = data.stripe_mode === 'mock' ? '#8a8a9a' : '#5cb85c';
+    badge.style.background = data.stripe_mode === 'mock' ? 'rgba(255,255,255,0.2)' : 'rgba(110,231,215,0.3)';
+    badge.style.color = data.stripe_mode === 'mock' ? 'rgba(255,255,255,0.8)' : '#d4f5ef';
   }
 }
 
@@ -1231,12 +1582,12 @@ function handleEscrowRelease(data) {
         const tasks = w.total_tasks || w.task_count || 0;
         const success = w.success_rate || '—';
         const status = w.status || 'active';
-        const statusColor = status === 'promoted' ? '#5cb85c' : status === 'halted' ? '#e74c3c' : '#5bc0de';
-        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#0d1117;border-radius:4px;border:1px solid #1a1a3e;">
-          <span style="font-size:11px;font-weight:bold;color:#5bc0de;min-width:60px;">${escapeHtml(w.agent_id || 'unknown')}</span>
-          <span style="font-size:13px;font-weight:bold;color:#f5a623;min-width:60px;">$${bal.toFixed(2)}</span>
-          <span style="font-size:10px;color:#666;flex:1;">${tasks} tasks · ${escapeHtml(String(success))} success</span>
-          <span style="font-size:9px;padding:2px 6px;border-radius:3px;background:#1a1a2e;color:${statusColor};">${status}</span>
+        const statusColor = status === 'promoted' ? '#2d9d6a' : status === 'halted' ? '#d94f4f' : '#1fa89d';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f7fbfa;border-radius:4px;border:1px solid #e3eeeb;">
+          <span style="font-family:'Mulish',sans-serif;font-size:11px;font-weight:700;color:#1fa89d;min-width:60px;">${escapeHtml(w.agent_id || 'unknown')}</span>
+          <span style="font-family:'Jost',sans-serif;font-size:14px;font-weight:700;color:#e09a2a;min-width:60px;">$${bal.toFixed(2)}</span>
+          <span style="font-size:11px;color:#8fa3a0;flex:1;">${tasks} tasks · ${escapeHtml(String(success))} success</span>
+          <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#eaf7f4;color:${statusColor};font-weight:600;">${status}</span>
         </div>`;
       }).join('');
   }
@@ -1248,16 +1599,16 @@ function handleEscrowRelease(data) {
     const layer = data.layer;
     const proofHtml = releases.map(r => {
       const ok = r.ok;
-      const color = ok ? '#5cb85c' : '#e74c3c';
+      const color = ok ? '#2d9d6a' : '#d94f4f';
       const icon = ok ? '✅' : '❌';
-      return `<div style="font-size:10px;color:#888;padding:3px 0;border-bottom:1px solid #0d1117;">
-        ${icon} <span style="color:#5bc0de;">${escapeHtml(r.agent_id)}</span>
-        → <span style="color:${color};font-weight:bold;">$${((r.amount_cents||0)/100).toFixed(2)}</span>
-        <span style="color:#555;font-size:9px;">${escapeHtml((r.transfer_id||'').slice(0,20))}</span>
+      return `<div style="font-size:11px;color:#5a706c;padding:4px 0;border-bottom:1px solid #eaf2f0;">
+        ${icon} <span style="color:#1fa89d;font-weight:600;">${escapeHtml(r.agent_id)}</span>
+        → <span style="color:${color};font-weight:700;">$${((r.amount_cents||0)/100).toFixed(2)}</span>
+        <span style="color:#9bb5b1;font-size:10px;font-family:monospace;">${escapeHtml((r.transfer_id||'').slice(0,20))}</span>
       </div>`;
     }).join('');
     const existing = proofsDiv.innerHTML;
-    proofsDiv.innerHTML = `<div style="font-size:9px;color:#555;margin-bottom:3px;">Batch ${layer} releases:</div>` + proofHtml + existing;
+    proofsDiv.innerHTML = `<div style="font-size:10px;color:#8fa3a0;margin-bottom:4px;font-weight:600;">Batch ${layer} releases:</div>` + proofHtml + existing;
   }
 }
 
@@ -1274,7 +1625,7 @@ function handleBenchmarkResults(data) {
   const speedupDiv = document.getElementById('bench-total-speedup');
   if (speedupDiv) {
     speedupDiv.textContent = `${speedup.toFixed(1)}x faster`;
-    speedupDiv.style.color = speedup > 10 ? '#5cb85c' : speedup > 3 ? '#f5a623' : '#e74c3c';
+    speedupDiv.style.color = speedup > 10 ? '#2d9d6a' : speedup > 3 ? '#e09a2a' : '#d94f4f';
   }
 
   // Per-task comparison
@@ -1282,7 +1633,7 @@ function handleBenchmarkResults(data) {
   const gTasks = glm.tasks || [];
   const tasksDiv = document.getElementById('bench-tasks');
   if (tasksDiv) {
-    let html = `<div style="display:grid;grid-template-columns:1fr 80px 80px 60px;gap:4px;font-size:9px;color:#8a8a9a;text-transform:uppercase;letter-spacing:1px;padding:4px 0;border-bottom:1px solid #1a1a3e;">
+    let html = `<div style="display:grid;grid-template-columns:1fr 80px 80px 60px;gap:6px;font-size:10px;color:#8fa3a0;text-transform:uppercase;letter-spacing:1px;padding:6px 0;border-bottom:1px solid #e3eeeb;font-weight:600;">
       <span>Task</span><span style="text-align:right;">Cerebras</span><span style="text-align:right;">GPU GLM</span><span style="text-align:right;">Speedup</span>
     </div>`;
 
@@ -1291,23 +1642,23 @@ function handleBenchmarkResults(data) {
       const cMs = ct.latency_ms || 0;
       const gMs = gt.latency_ms || 0;
       const tSpeedup = gMs > 0 && cMs > 0 ? gMs / cMs : 0;
-      const cColor = '#5cb85c';
-      const gColor = '#e74c3c';
-      const sColor = tSpeedup > 10 ? '#5cb85c' : tSpeedup > 3 ? '#f5a623' : '#e74c3c';
-      html += `<div style="display:grid;grid-template-columns:1fr 80px 80px 60px;gap:4px;padding:6px 4px;border-bottom:1px solid #0d1117;align-items:center;">
-        <span style="font-size:10px;color:#e0e0e0;">${escapeHtml(ct.task_name || ct.task_id || '?')}</span>
-        <span style="text-align:right;font-size:11px;font-weight:bold;color:${cColor};">${(cMs/1000).toFixed(1)}s</span>
-        <span style="text-align:right;font-size:11px;color:${gColor};">${(gMs/1000).toFixed(1)}s</span>
-        <span style="text-align:right;font-size:11px;font-weight:bold;color:${sColor};">${tSpeedup.toFixed(1)}x</span>
+      const cColor = '#1fa89d';
+      const gColor = '#e2605a';
+      const sColor = tSpeedup > 10 ? '#2d9d6a' : tSpeedup > 3 ? '#e09a2a' : '#d94f4f';
+      html += `<div style="display:grid;grid-template-columns:1fr 80px 80px 60px;gap:6px;padding:8px 4px;border-bottom:1px solid #eaf2f0;align-items:center;">
+        <span style="font-size:11px;color:#1f2d2c;font-weight:500;">${escapeHtml(ct.task_name || ct.task_id || '?')}</span>
+        <span style="text-align:right;font-family:'Jost',sans-serif;font-size:12px;font-weight:700;color:${cColor};">${(cMs/1000).toFixed(1)}s</span>
+        <span style="text-align:right;font-family:'Jost',sans-serif;font-size:12px;color:${gColor};">${(gMs/1000).toFixed(1)}s</span>
+        <span style="text-align:right;font-family:'Jost',sans-serif;font-size:12px;font-weight:700;color:${sColor};">${tSpeedup.toFixed(1)}x</span>
       </div>`;
     });
 
     // Totals row
-    html += `<div style="display:grid;grid-template-columns:1fr 80px 80px 60px;gap:4px;padding:8px 4px;margin-top:4px;background:#0d1117;border-radius:4px;align-items:center;">
-      <span style="font-size:10px;font-weight:bold;color:#f5a623;">TOTAL</span>
-      <span style="text-align:right;font-size:12px;font-weight:bold;color:#5cb85c;">${(cerebras.total_time_s||0).toFixed(1)}s</span>
-      <span style="text-align:right;font-size:12px;font-weight:bold;color:#e74c3c;">${(glm.total_time_s||0).toFixed(1)}s</span>
-      <span style="text-align:right;font-size:12px;font-weight:bold;color:#5cb85c;">${speedup.toFixed(1)}x</span>
+    html += `<div style="display:grid;grid-template-columns:1fr 80px 80px 60px;gap:6px;padding:10px 4px;margin-top:4px;background:#f7fbfa;border-radius:4px;align-items:center;">
+      <span style="font-family:'Jost',sans-serif;font-size:11px;font-weight:700;color:#e09a2a;">TOTAL</span>
+      <span style="text-align:right;font-family:'Jost',sans-serif;font-size:13px;font-weight:700;color:#1fa89d;">${(cerebras.total_time_s||0).toFixed(1)}s</span>
+      <span style="text-align:right;font-family:'Jost',sans-serif;font-size:13px;font-weight:700;color:#e2605a;">${(glm.total_time_s||0).toFixed(1)}s</span>
+      <span style="text-align:right;font-family:'Jost',sans-serif;font-size:13px;font-weight:700;color:#2d9d6a;">${speedup.toFixed(1)}x</span>
     </div>`;
 
     tasksDiv.innerHTML = html;
@@ -1333,7 +1684,7 @@ function closeRace() {
   if (overlay) overlay.classList.remove('active');
   if (raceTimerInterval) { clearInterval(raceTimerInterval); raceTimerInterval = null; }
   const btn = document.getElementById('btn-race');
-  if (btn) { btn.textContent = '🏁 Race'; btn.disabled = false; }
+  if (btn) { btn.textContent = '▶ Race'; btn.disabled = false; }
 }
 
 function handleComparisonStart(data) {
@@ -1351,6 +1702,8 @@ function handleComparisonStart(data) {
   // Show overlay
   const overlay = document.getElementById('race-overlay');
   overlay.classList.add('active');
+  const backdrop = document.getElementById('race-backdrop');
+  if (backdrop) backdrop.classList.add('active');
 
   // Hide finish banner
   const banner = document.getElementById('race-finish-banner');
@@ -1368,7 +1721,7 @@ function handleComparisonStart(data) {
     const userPrompt = document.getElementById('user-prompt').value.trim();
     const hasImage = window.uploadedImageB64 ? true : false;
     if (hasImage) {
-      promptDiv.innerHTML = `<span style="color:#f5a623">📷 Image uploaded</span> — ${userPrompt ? escapeHtml(userPrompt.slice(0, 150)) : 'vision model analyzing image content...'}`;
+      promptDiv.innerHTML = `<span style="color:#ffe5a0">📷 Image uploaded</span> — ${userPrompt ? escapeHtml(userPrompt.slice(0, 150)) : 'vision model analyzing image content...'}`;
     } else if (userPrompt) {
       promptDiv.textContent = `Prompt: ${userPrompt.slice(0, 200)}`;
     } else {
@@ -1505,7 +1858,7 @@ function handleComparisonProgress(data) {
     }
     if (latencySpan) {
       latencySpan.textContent = data.latency_s ? data.latency_s.toFixed(1) + 's' : '';
-      latencySpan.style.color = side === 'cerebras' ? '#5cb85c' : '#e74c3c';
+      latencySpan.style.color = side === 'cerebras' ? '#1fa89d' : '#e2605a';
     }
     if (outputDiv && data.content_preview) {
       outputDiv.style.display = 'block';
@@ -1517,7 +1870,7 @@ function handleComparisonProgress(data) {
     if (statusBadge) { statusBadge.className = 'race-task-status error'; statusBadge.textContent = 'error'; }
     if (outputDiv) {
       outputDiv.style.display = 'block';
-      outputDiv.innerHTML = `<div class="race-task-output-label" style="color:#e74c3c;">Error:</div>${escapeHtml(data.error || 'unknown')}`;
+      outputDiv.innerHTML = `<div class="race-task-output-label" style="color:#d94f4f;">Error:</div>${escapeHtml(data.error || 'unknown')}`;
     }
     sideState.tasks[taskId] = {done: true, error: data.error};
   }
@@ -1543,10 +1896,6 @@ function handleComparisonSideDone(data) {
   if (sideHeader && !sideHeader.querySelector('.race-finish-stamp')) {
     const stamp = document.createElement('div');
     stamp.className = 'race-finish-stamp';
-    stamp.style.cssText = 'font-size:10px;font-weight:bold;padding:3px 10px;border-radius:4px;' +
-      (side === 'cerebras'
-        ? 'background:#0d1f0d;color:#5cb85c;border:1px solid #2d6a2d;'
-        : 'background:#1f0d0d;color:#e74c3c;border:1px solid #8b0000;');
     stamp.textContent = `DONE ${totalTime.toFixed(1)}s (${successful}/${totalTasks} ok)`;
     sideHeader.appendChild(stamp);
   }
@@ -1579,7 +1928,7 @@ function handleComparisonSideDone(data) {
       }
       const detail = document.getElementById('race-finish-detail');
       if (detail) {
-        detail.innerHTML = `Cerebras: <b style="color:#5cb85c">${cTime.toFixed(1)}s</b> &nbsp;|&nbsp; GPU: <b style="color:#e74c3c">${gTime.toFixed(1)}s</b>`;
+        detail.innerHTML = `Cerebras: <b style="color:#d4f5ef">${cTime.toFixed(1)}s</b> &nbsp;|&nbsp; GPU: <b style="color:#ffd0cc">${gTime.toFixed(1)}s</b>`;
       }
     }
 
@@ -1588,7 +1937,7 @@ function handleComparisonSideDone(data) {
 
     // Re-enable race button
     const btn = document.getElementById('btn-race');
-    if (btn) { btn.textContent = '🏁 Race'; btn.disabled = false; }
+    if (btn) { btn.textContent = '▶ Race'; btn.disabled = false; }
 
     // Update header speedup badge
     const badge = document.getElementById('speedup-badge');
@@ -1596,10 +1945,10 @@ function handleComparisonSideDone(data) {
       badge.style.display = '';
       if (speedup > 1) {
         badge.textContent = `⚡ Cerebras ${speedup.toFixed(1)}x faster`;
-        badge.style.color = '#5cb85c'; badge.style.background = '#0d1f0d'; badge.style.borderColor = '#2d6a2d';
+        badge.style.color = '#0d6e66'; badge.style.background = '#d4f5ef'; badge.style.borderColor = '#8fd8cd';
       } else {
         badge.textContent = `⚡ GPU ${(1/speedup).toFixed(1)}x faster`;
-        badge.style.color = '#e74c3c'; badge.style.background = '#1f0d0d'; badge.style.borderColor = '#8b0000';
+        badge.style.color = '#a0443f'; badge.style.background = '#fdecea'; badge.style.borderColor = '#e8a8a3';
       }
     }
   }
@@ -1643,7 +1992,7 @@ function handleComparisonComplete(data) {
 
   // Re-enable race button
   const btn = document.getElementById('btn-race');
-  if (btn) { btn.textContent = '🏁 Race'; btn.disabled = false; }
+  if (btn) { btn.textContent = '▶ Race'; btn.disabled = false; }
 
   // Update header speedup badge
   const badge = document.getElementById('speedup-badge');
@@ -1652,14 +2001,10 @@ function handleComparisonComplete(data) {
     const speedupVal = speedup.toFixed(1);
     if (speedup > 1) {
       badge.textContent = `⚡ Cerebras ${speedupVal}x faster`;
-      badge.style.color = '#5cb85c';
-      badge.style.background = '#0d1f0d';
-      badge.style.borderColor = '#2d6a2d';
+      badge.style.color = '#0d6e66'; badge.style.background = '#d4f5ef'; badge.style.borderColor = '#8fd8cd';
     } else {
       badge.textContent = `⚡ GPU ${(1/speedup).toFixed(1)}x faster`;
-      badge.style.color = '#e74c3c';
-      badge.style.background = '#1f0d0d';
-      badge.style.borderColor = '#8b0000';
+      badge.style.color = '#a0443f'; badge.style.background = '#fdecea'; badge.style.borderColor = '#e8a8a3';
     }
   }
 }
