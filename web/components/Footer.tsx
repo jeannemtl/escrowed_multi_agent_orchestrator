@@ -7,18 +7,15 @@ interface FooterProps {
 export default function Footer({ onHelp }: FooterProps) {
   return (
     <footer className="app-footer">
-      <span>© 2026 Cerebrain · Multi-Agent Orchestrator</span>
+      <span className="footer-copy">© Cerebrain, 2026</span>
       <div className="footer-links">
-        <a onClick={onHelp}>Help</a>
-        <a
-          href="https://hermes-agent.nousresearch.com/docs"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Docs
-        </a>
-        <a>Privacy</a>
+        <a onClick={onHelp}>Home</a>
+        <a onClick={onHelp}>About</a>
+        <a onClick={onHelp}>Privacy</a>
+        <a onClick={onHelp}>Terms &amp; Conditions</a>
+        <a onClick={onHelp}>Account</a>
       </div>
+      <span className="footer-spacer" />
     </footer>
   );
 }

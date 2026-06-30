@@ -94,6 +94,23 @@ from stripe_charger import (
 
 BASE_RATE_CENTS = 10
 
+def _clean_output(content: str) -> str:
+    """Strip memory/context injections and system artifacts from LLM output."""
+    import re
+    # Remove <memory-context>...</memory-context> blocks
+    content = re.sub(r'<memory-context>.*?</memory-context>', '', content, flags=re.DOTALL)
+    # Remove [MEMORY]...[/MEMORY] blocks
+    content = re.sub(r'\[MEMORY\].*?\[/MEMORY\]', '', content, flags=re.DOTALL)
+    # Remove <!-- Spectral Memory ... --> blocks
+    content = re.sub(r'<!-- Spectral Memory.*?-->', '', content, flags=re.DOTALL)
+    # Remove [System note:...] lines
+    content = re.sub(r'\[System note:.*?\]', '', content, flags=re.DOTALL)
+    # Remove lines that look like spectral memory channels (KEY=VALUE)
+    content = re.sub(r'\n(USER\.\w+|TASK\.\w+|PROJ\.\w+|PREF\.\w+)=[^\n]+', '', content)
+    # Collapse extra whitespace from removals
+    content = re.sub(r'\n{3,}', '\n\n', content)
+    return content.strip()
+
 def compute_task_cost(task: Task, solana_latency_ms: float, depth: int) -> int:
     """Compute cost in cents for a verified task."""
     depth_mult = 1.0 + (depth * 0.5)
@@ -735,6 +752,8 @@ class MultiAgentBridge:
                         elapsed = _time.time() - t_start
                         ok = result.get("ok", False)
                         content = result.get("content", "")
+                        # Strip memory/context injections from the output
+                        content = _clean_output(content)
 
                         task_result = {
                             "task_id": task["id"],
@@ -743,7 +762,7 @@ class MultiAgentBridge:
                             "latency_ms": result.get("latency_ms", elapsed * 1000),
                             "latency_s": elapsed,
                             "content_length": len(content),
-                            "content_preview": content[:500],
+                            "content_preview": content[:5000],
                             "layer": layer_idx,
                         }
                         layer_results.append(task_result)
@@ -760,7 +779,7 @@ class MultiAgentBridge:
                                 "ok": ok,
                                 "latency_s": elapsed,
                                 "latency_ms": task_result["latency_ms"],
-                                "content_preview": content[:500],
+                                "content_preview": content[:5000],
                                 "content_length": len(content),
                                 "elapsed_s": _time.time() - start,
                             }

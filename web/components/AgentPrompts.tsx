@@ -16,109 +16,85 @@ const STAGE_COLORS: Record<string, string> = {
   completed: '#2d9d6a',
 };
 
+function statusLabel(s: AgentState['status']): string {
+  if (s === 'done') return 'DONE';
+  if (s === 'busy') return 'BUSY';
+  if (s === 'failed') return 'FAILED';
+  return 'IDLE';
+}
+
 export default function AgentPrompts({ agents }: AgentPromptsProps) {
   const count = agents.length;
-  const cardClass = (a: AgentState) => {
-    if (a.status === 'busy') return 'agent-prompt active';
-    if (a.status === 'done') return 'agent-prompt submitted';
-    if (a.status === 'failed') return 'agent-prompt failed';
-    return 'agent-prompt';
-  };
 
   return (
-    <div className="panel-card">
-      <div className="panel-header">
-        <span>Agent Prompts</span>
-        <span className="badge">{count} / 10</span>
+    <div className="agent-panel">
+      <div className="panel-title-row">
+        <span className="panel-title">Agent Prompts</span>
+        <span className="panel-count">{count} / 10</span>
       </div>
-      <div className="panel-body">
-        {agents.length === 0 ? (
-          <div className="confirmation-empty">
-            Fill in the prompt above and click Plan &amp; Submit.
-            <br />
-            Nemotron will decompose it into tasks with dependencies.
-          </div>
-        ) : (
-          agents.map((a) => {
-            const prog = a.progress;
-            const stageColor = prog ? STAGE_COLORS[prog.stage] || '#8fa3a0' : '#8fa3a0';
-            const deps =
-              a.dependencies && a.dependencies.length > 0
-                ? `deps: ${a.dependencies.join(', ')}`
-                : 'no deps';
-            return (
-              <div key={a.agentId} className={cardClass(a)}>
-                <div className="agent-prompt-header">
-                  <span className="agent-label">
-                    <span className="node-badge">NODE</span>
-                    {a.taskId || a.agentId} · {a.agentId}
-                  </span>
-                  <span className={`agent-status ${a.status}`}>{a.status}</span>
+
+      {count === 0 ? (
+        <div className="confirmation-empty">
+          Fill in the prompt above and click Plan &amp; Submit.
+          <br />
+          Nemotron will decompose it into tasks with dependencies.
+        </div>
+      ) : (
+        agents.map((a, i) => {
+          const prog = a.progress;
+          const stageColor = prog ? STAGE_COLORS[prog.stage] || '#8fa3a0' : '#8fa3a0';
+          const deps =
+            a.dependencies && a.dependencies.length > 0
+              ? `deps ${a.dependencies.join(', ')}`
+              : 'no deps';
+          const code = `A-${String(i + 1).padStart(2, '0')}`;
+          return (
+            <div key={a.agentId} className="agent-row">
+              <div className="agent-row-top">
+                <div className="agent-id-group">
+                  <div className="node-badge-sm">NODE</div>
+                  <span className="agent-id">{a.agentId}</span>
+                  <span className="agent-code">{code}</span>
                 </div>
-                {a.taskName && <div className="task-desc">{a.taskName}</div>}
-                {a.taskDescription && (
-                  <div className="task-sub">
-                    {a.taskDescription.slice(0, 150)}
-                  </div>
-                )}
-                <div className="deps">{deps}</div>
-                {prog && (
-                  <div className="task-result">
-                    {prog.stage === 'model_streaming' ? (
-                      <>
-                        <div className="task-result-label" style={{ color: stageColor }}>
-                          [{prog.time}] streaming (live)
-                        </div>
-                        <div
-                          style={{
-                            color: '#4a606c',
-                            fontSize: '10px',
-                            maxHeight: '150px',
-                            overflowY: 'auto',
-                            whiteSpace: 'pre-wrap',
-                            wordWrap: 'break-word',
-                          }}
-                        >
-                          {prog.detail}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="task-result-label" style={{ color: stageColor }}>
-                          [{prog.time}] {prog.stage}
-                        </div>
-                        <div style={{ color: '#5a706c' }}>{prog.detail}</div>
-                      </>
-                    )}
-                  </div>
-                )}
-                {a.result && !prog && (
-                  <div className="task-result">
-                    <div className="task-result-label">
-                      Result ({a.result.taskId}):
-                    </div>
-                    <div
-                      style={{
-                        maxHeight: '300px',
-                        overflowY: 'auto',
-                        whiteSpace: 'pre-wrap',
-                        wordWrap: 'break-word',
-                      }}
-                    >
-                      {a.result.summary}
-                    </div>
-                  </div>
-                )}
-                {a.verifyMethod && (
-                  <div className="agent-prompt-footer">
-                    <span className="verify-info">verify: {a.verifyMethod}</span>
-                  </div>
-                )}
+                <span className="agent-status-pill">
+                  <span className={`agent-status-dot ${a.status}`} />
+                  {statusLabel(a.status)}
+                </span>
               </div>
-            );
-          })
-        )}
-      </div>
+
+              <div className="agent-task">
+                {a.taskDescription
+                  ? a.taskDescription.slice(0, 160)
+                  : a.taskName || a.taskId || '—'}
+              </div>
+
+              {a.verifyMethod && (
+                <div className="agent-verify">
+                  verify {a.verifyMethod} · {deps}
+                </div>
+              )}
+
+              {prog && (
+                <div className="agent-stream">
+                  <div className="agent-stream-label" style={{ color: stageColor }}>
+                    [{prog.time}] {prog.stage === 'model_streaming' ? 'streaming (live)' : prog.stage}
+                  </div>
+                  {prog.detail}
+                </div>
+              )}
+
+              {a.result && !prog && (
+                <div className="agent-stream">
+                  <div className="agent-stream-label" style={{ color: '#2d9d6a' }}>
+                    Result ({a.result.taskId})
+                  </div>
+                  {a.result.summary}
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }

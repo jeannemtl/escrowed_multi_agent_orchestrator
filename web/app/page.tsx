@@ -21,8 +21,6 @@ export default function Page() {
   const [benchmarkRunning, setBenchmarkRunning] = useState(false);
   const [raceRunning, setRaceRunning] = useState(false);
 
-  // Read dashboard data from the currently selected project (back-compat
-  // flat API on ws already derives from the current project).
   const planned = ws.plannedTasks.length > 0;
 
   function handleConnect() {
@@ -40,12 +38,17 @@ export default function Page() {
   }
 
   function handleRace() {
+    // If a race is live (not finished), just reopen the panel.
+    if (ws.race && !ws.race.finish) {
+      ws.reopenRace();
+      return;
+    }
+    // Race is finished or none yet — start a new one.
     ws.startRace(prompt, image);
     setRaceRunning(true);
   }
 
   function handleCloseRace() {
-    // Minimize the panel; the race keeps running in the background.
     ws.closeRace();
   }
 
@@ -67,7 +70,6 @@ export default function Page() {
     ws.selectProject(id);
   }
 
-  // The race "running" state should clear once a finish or side_done arrives.
   const raceDone =
     ws.race?.finish || (ws.race?.cerebras.done && ws.race?.gpu.done);
 
@@ -77,74 +79,79 @@ export default function Page() {
     }
   }, [raceDone, raceRunning]);
 
-  // Show the floating reopen button while a race is live but the panel is hidden.
   const raceLive = !!ws.race && !raceDone;
   const showReopenButton = raceLive && ws.raceMinimized;
 
+  const ctaSubtitle = ws.speedupBadge
+    ? `${ws.speedupBadge.text} — settled on-chain.`
+    : 'Cerebras × GPU — race them, settle on-chain.';
+
   return (
-    <>
-      <Header
-        connected={ws.connected}
-        speedupBadge={ws.speedupBadge}
-        onConnect={handleConnect}
-        onStart={handleStart}
-        onBenchmark={handleBenchmark}
-        onRace={handleRace}
-        onHelp={ws.showHelp}
-        planned={planned}
-        benchmarkRunning={benchmarkRunning}
-        raceRunning={raceRunning}
-      />
-
-      <SearchBar
-        connected={ws.connected}
-        plannerStatus={ws.plannerStatus}
-        plannerStatusColor={ws.plannerStatusColor}
-        onPlan={handlePlan}
-        onPromptImageChange={handlePromptImageChange}
-      />
-
-      <PromptHistory
-        items={ws.promptHistory}
-        activeId={ws.currentProjectId}
-        onSelect={handleSelectProject}
-      />
-
-      <SummaryBar
-        totalTasks={ws.summary.totalTasks}
-        totalLayers={ws.summary.totalLayers}
-        confirmed={ws.summary.confirmed}
-        txs={ws.summary.txs}
-        totalCostCents={ws.summary.totalCostCents}
-        savings={ws.summary.savings}
-      />
-
-      <BudgetBar budget={ws.budget} halted={!!ws.halted} />
-
-      <div className="main-grid">
-        <AgentPrompts agents={ws.agents} />
-        <TaskDAG
-          layers={ws.layers}
-          taskMap={ws.taskMap}
-          plannedTasks={ws.plannedTasks}
+    <div className="page">
+      <div className="container">
+        <Header
+          connected={ws.connected}
+          speedupBadge={ws.speedupBadge}
+          onConnect={handleConnect}
+          onStart={handleStart}
+          onBenchmark={handleBenchmark}
+          onRace={handleRace}
+          onHelp={ws.showHelp}
+          planned={planned}
+          benchmarkRunning={benchmarkRunning}
+          raceRunning={raceRunning}
         />
-        <OnChainLedger
-          attestations={ws.attestations}
-          escrow={ws.escrow}
-          halted={ws.halted}
+
+        <SearchBar
+          connected={ws.connected}
+          plannerStatus={ws.plannerStatus}
+          plannerStatusColor={ws.plannerStatusColor}
+          onPlan={handlePlan}
+          onPromptImageChange={handlePromptImageChange}
+        />
+
+        <PromptHistory
+          items={ws.promptHistory}
+          activeId={ws.currentProjectId}
+          onSelect={handleSelectProject}
+        />
+
+        <SummaryBar
+          totalTasks={ws.summary.totalTasks}
+          totalLayers={ws.summary.totalLayers}
+          confirmed={ws.summary.confirmed}
+          txs={ws.summary.txs}
           totalCostCents={ws.summary.totalCostCents}
           savings={ws.summary.savings}
         />
-        <BenchmarkPanel benchmark={ws.benchmark} />
-      </div>
 
-      <div className="race-cta" onClick={handleRace}>
-        <span className="cta-text">
-          Watch them race. <span className="arrow">▶</span>
-        </span>
-      </div>
+        <BudgetBar budget={ws.budget} halted={!!ws.halted} />
 
-      <Footer onHelp={ws.showHelp} />
+        <div className="three-col">
+          <AgentPrompts agents={ws.agents} />
+          <TaskDAG
+            layers={ws.layers}
+            taskMap={ws.taskMap}
+            plannedTasks={ws.plannedTasks}
+          />
+          <OnChainLedger
+            attestations={ws.attestations}
+            escrow={ws.escrow}
+            halted={ws.halted}
+            totalCostCents={ws.summary.totalCostCents}
+            savings={ws.summary.savings}
+          />
+        </div>
+
+        {ws.benchmark && <BenchmarkPanel benchmark={ws.benchmark} />}
+
+        <div className="big-cta" onClick={handleRace}>
+          <div className="big-cta-text">Watch them race.</div>
+          <div className="big-cta-sub">{ctaSubtitle}</div>
+        </div>
+
+        <Footer onHelp={ws.showHelp} />
+      </div>
 
       <RacePanel
         race={ws.race}
@@ -164,6 +171,6 @@ export default function Page() {
           🏁 Race Live
         </button>
       )}
-    </>
+    </div>
   );
 }

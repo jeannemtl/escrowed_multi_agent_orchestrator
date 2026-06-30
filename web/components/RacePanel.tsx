@@ -11,13 +11,6 @@ interface RacePanelProps {
   plannerStatusColor?: string;
 }
 
-const STEPS = [
-  { key: 'attest-0', label: 'Attest Batch 0', num: 1 },
-  { key: 'attest-1', label: 'Attest Batch 1', num: 2 },
-  { key: 'confirm', label: 'Confirmation', num: 3 },
-  { key: 'escrow', label: 'Escrow Payment', num: 4 },
-];
-
 export default function RacePanel({
   race,
   open,
@@ -26,181 +19,151 @@ export default function RacePanel({
   plannerStatus = '',
   plannerStatusColor = '#ffe5a0',
 }: RacePanelProps) {
-  // When in the race planning phase (before comparison_start), show a centered
-  // loading state with the planning message instead of task cards.
   const showPlanning = planning && !race;
 
   return (
-    <>
-      <div
-        className={`race-backdrop ${open ? 'active' : ''}`}
-        onClick={onClose}
-        style={{ display: open ? 'block' : 'none' }}
-      />
-      <div className={`race-overlay ${open ? 'active' : ''}`}>
-        <div className="race-header">
-          <h1>🏁 Live Race: Cerebras vs GPU</h1>
-          <button className="race-close" onClick={onClose} title="Hide panel (race continues)">
-            — Hide
+    <div className={`race-overlay${open ? '' : ' hidden'}`}>
+      <div className="race-topbar">
+        <div className="race-topbar-left">
+          <span className="race-title">Live Race</span>
+          <span className="race-subtitle">Cerebras × GPU</span>
+        </div>
+        <div className="race-topbar-right">
+          <button className="race-btn-close" onClick={onClose} title="Close race panel">
+            Close ✕
           </button>
         </div>
-
-        {showPlanning ? (
-          <div className="race-planning-state">
-            <div className="race-planning-spinner" aria-hidden />
-            <div
-              className="race-planning-text"
-              style={{ color: plannerStatusColor }}
-            >
-              {plannerStatus || 'Analyzing image with vision model, then decomposing into race tasks...'}
-            </div>
-            <div className="race-planning-sub">
-              Preparing race tasks · Cerebras vs GPU
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="race-prompt-display">
-              {race ? race.promptDisplay : ''}
-            </div>
-
-            {race && race.decomposition.length > 0 && (
-              <div className="race-decomp" style={{ display: 'flex' }}>
-                <span className="race-decomp-label">Decomposition:</span>
-                {race.decomposition.map((layer, i) => (
-                  <div key={layer.layer} style={{ display: 'flex', alignItems: 'center' }}>
-                    {i > 0 && <span className="race-decomp-arrow">&gt;&gt;&gt;</span>}
-                    <div className="race-decomp-layer">
-                      <span className="race-decomp-layer-num">L{layer.layer}</span>
-                      <span className="race-decomp-layer-name">{layer.name}</span>
-                      <span className="race-decomp-layer-tasks">
-                        {layer.tasks?.length || 0} tasks
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Steppers */}
-            {(['cerebras', 'gpu'] as const).map((side) => (
-              <div key={side} className="race-stepper">
-                {STEPS.map((step, i) => {
-                  const state = race?.steps[side][step.key] || 'pending';
-                  return (
-                    <div key={step.key} style={{ display: 'flex', alignItems: 'center' }}>
-                      {i > 0 && <span className="race-step-arrow">&gt;&gt;&gt;</span>}
-                      <div className={`race-step ${state}`}>
-                        <div className="race-step-circle">
-                          {state === 'done' ? '✓' : step.num}
-                        </div>
-                        <span className="race-step-label">{step.label}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-                <span className={`race-step-side-label ${side}`}>
-                  {side.toUpperCase()}
-                </span>
-              </div>
-            ))}
-
-            <div className="race-body">
-              {race &&
-                (['cerebras', 'gpu'] as const).map((side) => (
-                  <RaceSide
-                    key={side}
-                    side={side}
-                    race={race}
-                    layers={race.layers}
-                  />
-                ))}
-            </div>
-
-            {race?.finish && (
-              <div className="race-finish-banner">
-                <div className={`race-speedup ${race.finish.winner}`}>
-                  {race.finish.speedup > 1
-                    ? `CEREBRAS ${race.finish.speedup.toFixed(1)}x FASTER`
-                    : race.finish.speedup > 0
-                      ? `GPU ${(1 / race.finish.speedup).toFixed(1)}x FASTER`
-                      : 'RACE COMPLETE'}
-                </div>
-                <div className="race-finish-detail">
-                  Cerebras: <b style={{ color: '#d4f5ef' }}>{race.finish.cerebrasTime.toFixed(1)}s</b>
-                  &nbsp;|&nbsp; GPU: <b style={{ color: '#ffd0cc' }}>{race.finish.gpuTime.toFixed(1)}s</b>
-                </div>
-              </div>
-            )}
-          </>
-        )}
       </div>
-    </>
+
+      {showPlanning ? (
+        <div className="race-planning-state">
+          <div className="race-planning-spinner" aria-hidden />
+          <div className="race-planning-text" style={{ color: plannerStatusColor }}>
+            {plannerStatus ||
+              'Analyzing image with vision model, then decomposing into race tasks…'}
+          </div>
+          <div className="race-planning-sub">
+            Preparing race tasks · Cerebras vs GPU
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="race-infobar">
+            <span className="race-info-prompt">
+              {race ? race.promptDisplay : ''}
+            </span>
+            <div className="race-info-spacer" />
+            {race &&
+              race.decomposition.length > 0 &&
+              race.decomposition.map((layer, i) => (
+                <div
+                  key={layer.layer}
+                  style={{ display: 'flex', alignItems: 'center' }}
+                >
+                  {i > 0 && <span className="race-info-arrow">›››</span>}
+                  <span className="race-info-chip">
+                    L{layer.layer} · {layer.name || 'Batch'} ·{' '}
+                    {layer.tasks?.length || layer.task_ids?.length || 0}
+                  </span>
+                </div>
+              ))}
+          </div>
+
+          <div className="race-grid">
+            {race &&
+              (['cerebras', 'gpu'] as const).map((side) => (
+                <RaceSide key={side} side={side} race={race} />
+              ))}
+          </div>
+
+          {race?.finish && (
+            <div className="race-finish-banner">
+              <div className="race-finish-headline">
+                <b>
+                  {race.finish.winner === 'cerebras' ? 'CEREBRAS' : 'GPU'}
+                </b>{' '}
+                {race.finish.speedup >= 1
+                  ? `${race.finish.speedup.toFixed(1)}× faster`
+                  : `${(1 / race.finish.speedup).toFixed(1)}× faster`}
+              </div>
+              <div className="race-finish-detail">
+                Cerebras {race.finish.cerebrasTime.toFixed(1)}s (
+                {race.finish.cerebrasSuccessful}/{race.finish.cerebrasTotal}) · GPU{' '}
+                {race.finish.gpuTime.toFixed(1)}s ({race.finish.gpuSuccessful}/
+                {race.finish.gpuTotal})
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
 function RaceSide({
   side,
   race,
-  layers,
 }: {
   side: 'cerebras' | 'gpu';
   race: RaceState;
-  layers: LayerInfo[];
 }) {
-  const sideState = race[side];
-  const timerText = (
-    sideState.done ? sideState.totalTime : sideState.elapsed
-  ).toFixed(1) + 's';
+  const s = race[side];
   const model = side === 'cerebras' ? race.cerebrasModel : race.glmModel;
+  // Compute elapsed from startTime so it's never stale on re-render
+  const liveElapsed = (Date.now() - race.startTime) / 1000;
+  const timer = (s.done ? s.totalTime : (s.elapsed || liveElapsed)).toFixed(1) + 's';
   const totalBudget = race.budget || 500;
-  const remaining = totalBudget - sideState.released;
   const releasedPct =
-    totalBudget > 0 ? Math.max(0, ((totalBudget - remaining) / totalBudget) * 100) : 0;
+    totalBudget > 0
+      ? Math.max(0, Math.min(100, (s.released / totalBudget) * 100))
+      : 0;
+  const finished = !!race.finish;
+  const isWinner = race.finish?.winner === side;
 
   return (
     <div className={`race-side ${side}`}>
+      {finished && isWinner && <div className="race-side-glow" />}
+
       <div className="race-side-header">
         <div>
-          <div>{side.toUpperCase()}</div>
+          <div className="race-side-title-row">
+            <span className="race-side-name">{side.toUpperCase()}</span>
+            {!finished && <span className="race-live-dot" />}
+            {finished && (
+              <span className="race-done-stamp">
+                DONE · {s.finishStamp ? `${s.finishStamp.successful}/${s.finishStamp.totalTasks} OK` : 'OK'}
+              </span>
+            )}
+          </div>
           <div className="race-model-name">{model}</div>
-          {sideState.finishStamp && (
-            <div className="race-finish-stamp">
-              DONE {sideState.finishStamp.time.toFixed(1)}s (
-              {sideState.finishStamp.successful}/{sideState.finishStamp.totalTasks} ok)
-            </div>
-          )}
         </div>
-        <div className="race-timer">{timerText}</div>
+        <span className="race-timer">{timer}</span>
       </div>
+
       <div className="race-tasks">
-        {layers.map((layer) => (
-          <RaceLayerGroup
-            key={layer.layer}
-            side={side}
-            layer={layer}
-            race={race}
-          />
+        {race.layers.map((layer) => (
+          <RaceBatchBlock key={layer.layer} side={side} layer={layer} race={race} />
         ))}
       </div>
-      <div className="race-escrow">
-        <div className="race-escrow-label">Escrow &amp; Agent Wallet</div>
-        <div className="race-escrow-bar">
+
+      <div className="race-escrow-box">
+        <div className="race-escrow-line">
+          <span>Escrow &amp; agent wallet</span>
+          <span>Budget ${(totalBudget / 100).toFixed(2)}</span>
+        </div>
+        <div className="race-escrow-track">
           <div className="race-escrow-fill" style={{ width: `${releasedPct}%` }} />
         </div>
-        <div className="race-escrow-detail">
-          <span>Released: ${(sideState.released / 100).toFixed(2)}</span>
-          <span>Budget: ${(totalBudget / 100).toFixed(2)}</span>
-        </div>
-        <div className="race-escrow-wallet">
-          Agent wallet: ${(sideState.wallet / 100).toFixed(2)}
+        <div className="race-escrow-sub">
+          <span className="released">Released ${(s.released / 100).toFixed(2)}</span>
+          <span className="wallet">Agent wallet ${(s.wallet / 100).toFixed(2)}</span>
         </div>
       </div>
     </div>
   );
 }
 
-function RaceLayerGroup({
+function RaceBatchBlock({
   side,
   layer,
   race,
@@ -213,67 +176,53 @@ function RaceLayerGroup({
   const attested = layerState?.attested;
   const tasks = layer.tasks || [];
   const taskIds = layer.task_ids || tasks.map((t) => t.id);
+  const taskCount = layerState?.taskCount || taskIds.length;
+  const verified = layerState?.verifiedCount ?? 0;
 
   return (
-    <div className="race-layer-group">
-      <div className="race-layer-header">
-        <span>
-          Batch {layer.layer}: {layer.name || ''}
+    <div className="race-batch-block">
+      <div className="race-batch-header">
+        <span className="race-batch-title">
+          Batch {layer.layer} · {layer.name || ''}
         </span>
-        <span className={`race-layer-status ${attested ? 'attested' : 'dispatching'}`}>
+        <span className="race-batch-badge">
           {attested
-            ? `attested (${layerState?.verifiedCount}/${layerState?.taskCount})`
-            : `${layerState?.status || 'dispatching'} (${layerState?.taskCount || tasks.length} tasks)`}
+            ? `attested ${verified}/${taskCount}`
+            : `${layerState?.status || 'dispatching'} ${taskCount}`}
         </span>
       </div>
+
       {tasks.map((task) => {
         const tid = task.id;
-        const taskState = race[side].tasks[tid];
+        const ts = race[side].tasks[tid];
         let cardClass = 'race-task-card';
-        let statusClass = 'race-task-status pending';
-        let statusText = 'pending';
-        if (taskState?.done) {
-          if (taskState.error) {
-            cardClass = 'race-task-card error';
-            statusClass = 'race-task-status error';
-            statusText = 'error';
-          } else {
-            cardClass = 'race-task-card done';
-            statusClass = 'race-task-status done';
-            statusText = taskState.ok === false ? 'failed' : 'done';
-          }
-        } else if (taskState) {
+        if (ts?.done) {
+          cardClass = ts.error
+            ? 'race-task-card error'
+            : 'race-task-card done';
+        } else if (ts) {
           cardClass = 'race-task-card active';
-          statusClass = 'race-task-status running';
-          statusText = 'running...';
         }
-        const latencyText = taskState?.latency_s
-          ? taskState.latency_s.toFixed(1) + 's'
-          : '';
-        const latencyColor = side === 'cerebras' ? '#1fa89d' : '#e2605a';
+        const lat = ts?.latency_s ? `${ts.latency_s.toFixed(1)}s` : '—';
         return (
           <div key={tid} className={cardClass}>
-            <div className="race-task-name">
-              {task.name}
-              <span className="race-task-latency" style={{ color: latencyText ? latencyColor : 'transparent' }}>
-                {latencyText}
-              </span>
+            <div className="race-task-line">
+              <span className="race-task-name">{task.name}</span>
+              <span className="race-task-lat">{lat}</span>
             </div>
-            <span className={statusClass}>{statusText}</span>
+            {ts?.error && <div className="race-task-out">{ts.error}</div>}
           </div>
         );
       })}
+
       {attested && (
         <div className="race-attest">
-          <span className="race-attest-icon">✅</span>
-          <span className="race-attest-detail">
-            Batch {layer.layer} attested · {layerState?.verifiedCount}/
-            {layerState?.taskCount} verified ·{' '}
-            {((layerState?.latencyMs || 0) / 1000).toFixed(1)}s · $
-            {((layerState?.costCents || 0) / 100).toFixed(2)}
-          </span>
+          <span className="race-attest-icon">✓</span>
+          Batch {layer.layer} attested · {verified}/{taskCount} verified ·{' '}
+          {((layerState?.latencyMs || 0) / 1000).toFixed(1)}s · $
+          {((layerState?.costCents || 0) / 100).toFixed(2)} ·{' '}
           <span className="race-attest-sig">
-            {(layerState?.signature || '').slice(0, 20)}...
+            {(layerState?.signature || '').slice(0, 12)}…
           </span>
         </div>
       )}

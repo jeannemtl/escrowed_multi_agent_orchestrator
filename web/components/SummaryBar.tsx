@@ -33,7 +33,7 @@ export default function SummaryBar({
       </div>
       <div className="stat-cell">
         <div className="val">{txs}</div>
-        <div className="lbl">Solana Txs</div>
+        <div className="lbl">On-Chain Txs</div>
       </div>
       <div className="stat-cell">
         <div className="val">${(totalCostCents / 100).toFixed(2)}</div>

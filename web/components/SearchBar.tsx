@@ -59,6 +59,7 @@ export default function SearchBar({
   return (
     <section className="search-section">
       <div className="search-bar">
+        <span className="search-icon">⌕</span>
         <textarea
           className="prompt-input"
           placeholder="Describe what you want the agents to do…"
@@ -66,28 +67,30 @@ export default function SearchBar({
           onChange={handlePromptChange}
           rows={1}
         />
-        <label className="image-btn" htmlFor="image-upload">
-          📷 Image
-        </label>
-        <input
-          id="image-upload"
-          type="file"
-          accept="image/*"
-          ref={fileRef}
-          style={{ display: 'none' }}
-          onChange={handleImageUpload}
-        />
-        {imageB64 && (
-          <div className="image-preview-wrap">
-            <img className="image-preview" src={imagePreview} alt="preview" />
-            <button className="image-clear" onClick={clearImage}>
-              remove
-            </button>
-          </div>
-        )}
-        <button className="plan-btn" onClick={handlePlan} disabled={planDisabled}>
-          Plan &amp; Submit ➜
-        </button>
+        <div className="search-actions">
+          <label className="image-btn" htmlFor="image-upload">
+            📷 Image
+          </label>
+          <input
+            id="image-upload"
+            type="file"
+            accept="image/*"
+            ref={fileRef}
+            style={{ display: 'none' }}
+            onChange={handleImageUpload}
+          />
+          {imageB64 && (
+            <div className="image-preview-wrap">
+              <img className="image-preview" src={imagePreview} alt="preview" />
+              <button className="image-clear" onClick={clearImage}>
+                remove
+              </button>
+            </div>
+          )}
+          <button className="plan-btn" onClick={handlePlan} disabled={planDisabled}>
+            Plan &amp; Submit ➜
+          </button>
+        </div>
       </div>
       <div className="planner-status">
         {plannerStatus && (

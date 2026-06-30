@@ -29,41 +29,43 @@ export default function Header({
 }: HeaderProps) {
   return (
     <header className="app-header">
-      <div className="brand">
-        <div className="logo-mark">C</div>
-        Cerebrain
-      </div>
-      <div className="header-right">
-        <div className="conn-status">
-          <span className={`conn-dot ${connected ? '' : 'offline'}`} />
-          <span>{connected ? 'Connected' : 'Disconnected'}</span>
-        </div>
-        <button className="nav-item" onClick={onConnect}>
-          {connected ? 'Connected' : 'Connect'}
+      <span className="brand">Cerebrain</span>
+
+      <button
+        className={`connect-btn ${connected ? 'connected' : ''}`}
+        onClick={onConnect}
+      >
+        {connected ? 'Connected' : 'Connect'}
+      </button>
+
+      <nav className="header-nav">
+        <button className="nav-link" onClick={onStart} disabled={!planned || !connected}>
+          Start Pipeline
         </button>
-        <nav className="nav-items">
-          <button className="nav-item" onClick={onStart} disabled={!planned || !connected}>
-            Start Pipeline
-          </button>
-          <span className="nav-sep">|</span>
-          <button className="nav-item" onClick={onBenchmark} disabled={benchmarkRunning || !connected}>
-            {benchmarkRunning ? 'Running...' : 'Benchmark'}
-          </button>
-          <span className="nav-sep">|</span>
-          <button className="nav-item race" onClick={onRace} disabled={raceRunning || !connected}>
-            {raceRunning ? 'Racing...' : '▶ Race'}
-          </button>
-          <span className="nav-sep">|</span>
-          <button className="nav-item" onClick={onHelp}>
-            Help
-          </button>
-        </nav>
+        <span className="nav-sep" />
+        <button className="nav-link" onClick={onBenchmark} disabled={benchmarkRunning || !connected}>
+          {benchmarkRunning ? 'Running…' : 'Benchmark'}
+        </button>
+        <span className="nav-sep" />
+        <button className="nav-link race" onClick={onRace} disabled={!connected}>
+          ▶ Race
+        </button>
+        <span className="nav-sep" />
+        <div className="nav-grid" aria-hidden title="Dashboard">
+          <span /><span /><span /><span />
+          <span /><span /><span /><span />
+          <span /><span /><span /><span />
+        </div>
+        <button className="nav-link" onClick={onHelp}>
+          Help
+        </button>
+
         {speedupBadge && (
           <span className={`speedup-badge ${speedupBadge.variant === 'gpu' ? 'gpu' : ''}`}>
             {speedupBadge.text}
           </span>
         )}
-      </div>
+      </nav>
     </header>
   );
 }
