@@ -98,16 +98,15 @@ function nextProjectId(): string {
 }
 
 function dateStrNow(): string {
-  return new Date()
-    .toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    .replace('/', ' / ');
+  return new Date().toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
-const SEED_PROJECTS: Project[] = [
-  emptyProject('seed-1', 'Research IBM sub-nm chip vs Huawei LogicFolding, then synthesize.', 'Dec / 26'),
-  emptyProject('seed-2', 'Summarize the HBM4 bandwidth roadmap across vendors.', 'Dec / 27'),
-  emptyProject('seed-3', 'Survey UCIe chiplet adoption and interop risks.', 'Dec / 28'),
-];
+/* Start with no projects — they're created when the user submits a prompt. */
 
 export interface WebSocketApi {
   connected: boolean;
@@ -167,12 +166,12 @@ export interface WebSocketApi {
 export function useWebSocket(wsUrl: string = DEFAULT_WS_URL): WebSocketApi {
   const wsRef = useRef<WebSocket | null>(null);
   const raceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const currentProjectIdRef = useRef<string>('seed-3');
+  const currentProjectIdRef = useRef<string>('');
   const raceProjectIdRef = useRef<string | null>(null);
 
   const [connected, setConnected] = useState(false);
-  const [projects, setProjects] = useState<Project[]>(SEED_PROJECTS);
-  const [currentProjectId, setCurrentProjectId] = useState<string>('seed-3');
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [currentProjectId, setCurrentProjectId] = useState<string>('');
   // global (non-project) state
   const [budget, setBudget] = useState<BudgetData>({
     budget_cents: 500,
@@ -1216,7 +1215,7 @@ export function useWebSocket(wsUrl: string = DEFAULT_WS_URL): WebSocketApi {
 
   /* ── Derived: current project (back-compat flat API) ── */
   const currentProject =
-    projects.find((p) => p.id === currentProjectId) || projects[projects.length - 1] || SEED_PROJECTS[0];
+    projects.find((p) => p.id === currentProjectId) || projects[projects.length - 1] || emptyProject('', '', '');
 
   const promptHistory = projects.map((p) => ({ id: p.id, text: p.prompt, date: p.date }));
 

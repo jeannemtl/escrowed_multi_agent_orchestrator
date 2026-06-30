@@ -259,6 +259,23 @@ body {
   gap: 0;
   padding: 10px 36px 6px 36px;
   overflow-x: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.25) transparent;
+}
+.prompt-history::-webkit-scrollbar {
+  height: 6px;
+}
+.prompt-history::-webkit-scrollbar-track {
+  background: transparent;
+}
+.prompt-history::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 3px;
+}
+.prompt-history::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.35);
 }
 .prompt-history .hist-label {
   font-family: 'Jost', sans-serif;
@@ -269,6 +286,11 @@ body {
   color: rgba(255, 255, 255, 0.6);
   margin-right: 12px;
   white-space: nowrap;
+  position: sticky;
+  left: 36px;
+  z-index: 1;
+  background: #0a0e14;
+  padding-right: 8px;
 }
 .prompt-history .hist-item {
   padding: 5px 14px;
@@ -279,6 +301,7 @@ body {
   cursor: pointer;
   border-right: 1px solid rgba(255, 255, 255, 0.2);
   transition: background 0.15s;
+  flex-shrink: 0;
 }
 .prompt-history .hist-item:last-child {
   border-right: none;
@@ -297,6 +320,13 @@ body {
   border-radius: 4px;
   color: #fff;
   font-weight: 600;
+}
+.prompt-history .hist-empty {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: 'Mulish', sans-serif;
+  white-space: nowrap;
+  font-style: italic;
 }
 
 /* ── Summary + Budget bar ── */
